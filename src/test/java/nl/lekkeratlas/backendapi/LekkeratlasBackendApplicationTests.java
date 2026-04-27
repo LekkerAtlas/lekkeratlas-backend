@@ -6,7 +6,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 @SpringBootTest(
         classes = LekkeratlasBackendApplication.class,
         properties = {
-                "spring.profiles.active=backend,dev",
+                "spring.profiles.active=backend,dev,test",
                 "spring.rabbitmq.listener.simple.auto-startup=false"
         }
 )

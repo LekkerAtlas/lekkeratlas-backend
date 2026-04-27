@@ -6,7 +6,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 @SpringBootTest(
         classes = WorkerApplication.class,
         properties = {
-                "spring.profiles.active=worker,dev",
+                "spring.profiles.active=worker,dev,test",
                 "spring.main.web-application-type=none",
                 "spring.rabbitmq.listener.simple.auto-startup=false"
         }
