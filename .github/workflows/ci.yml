@@ -46,7 +46,7 @@ jobs:
       packages: write
     with:
       registry: ghcr.io
-      backend_image_name: ${{ github.repository }}-backend
+      api_image_name: ${{ github.repository }}-api
       worker_image_name: ${{ github.repository }}-worker
       publish_experimental: ${{ needs.decide-publishing.outputs.publish_experimental == 'true' }}
       publish_release: ${{ needs.decide-publishing.outputs.publish_release == 'true' }}
