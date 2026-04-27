@@ -1,4 +1,6 @@
 package nl.lekkeratlas.backendapi.web.dto;
 
-public class AddVideoRequest {
+public record AddVideoRequest(
+        String videoId
+) {
 }

@@ -1,4 +1,10 @@
 package nl.lekkeratlas.shared.command;
 
-public class AddVideoCommand {
+import java.util.UUID;
+
+public record AddVideoCommand(
+        String videoId,
+        UUID requestedByUserId,
+        AddVideoSource source
+) {
 }

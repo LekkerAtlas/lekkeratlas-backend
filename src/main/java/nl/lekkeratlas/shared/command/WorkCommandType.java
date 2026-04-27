@@ -1,4 +1,6 @@
 package nl.lekkeratlas.shared.command;
 
-public class WorkCommandType {
+public enum WorkCommandType {
+    ADD_CHANNEL,
+    ADD_VIDEO
 }

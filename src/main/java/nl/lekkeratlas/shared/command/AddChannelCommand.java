@@ -1,4 +1,9 @@
 package nl.lekkeratlas.shared.command;
 
-public class AddChannelCommand {
+import java.util.UUID;
+
+public record AddChannelCommand(
+        String channelId,
+        UUID requestedByUserId
+) {
 }

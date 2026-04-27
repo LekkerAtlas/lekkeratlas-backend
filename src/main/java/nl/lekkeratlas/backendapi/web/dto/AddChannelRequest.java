@@ -1,4 +1,6 @@
 package nl.lekkeratlas.backendapi.web.dto;
 
-public class AddChannelRequest {
+public record AddChannelRequest(
+        String channelUrl
+) {
 }

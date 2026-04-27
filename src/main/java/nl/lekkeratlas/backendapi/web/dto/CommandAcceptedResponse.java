@@ -1,4 +1,8 @@
 package nl.lekkeratlas.backendapi.web.dto;
 
-public class CommandAcceptedResponse {
+import java.util.UUID;
+
+public record CommandAcceptedResponse(
+        UUID commandId
+) {
 }

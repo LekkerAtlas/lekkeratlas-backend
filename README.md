@@ -65,7 +65,18 @@ docker run -p 8080:8080 \
 3. User logs in
 4. Authentik redirects back with an authorization code
 5. Spring exchanges the code for tokens
-6. User is authenticated in the application
+
+## Asynchronous Communication and Scaling
+
+The application is designed with a decoupled, asynchronous messaging backbone using RabbitMQ. This pattern ensures that the primary API remains fast and responsive by offloading heavy or long-running tasks (like scraping video metadata or processing channels) to dedicated Worker services.
+
+**Flow:**
+1.  **Producer (API):** When a client initiates a task (e.g., adding a channel), the API does not perform the work. Instead, it creates a standardized `WorkCommandEnvelope` (e.g., `AddChannelCommand`) and **produces** this message onto a designated RabbitMQ queue.
+2.  **Broker (RabbitMQ):** RabbitMQ reliably queues the message and ensures it is persisted until a consumer is available.
+3.  **Consumer (Worker):** The Worker service is configured to **listen** to the queue. Upon receiving a command, it consumes the message and executes the actual business logic (e.g., calling external APIs or performing complex processing).
+
+**Benefit:** This decoupling allows the Worker service to be scaled independently of the API. If task load increases, you can simply spin up more worker instances to process the queue, improving resilience and throughput without touching the API layer.
+
 
 ## Notes
 
