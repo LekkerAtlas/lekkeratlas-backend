@@ -6,7 +6,7 @@ on:
       registry:
         required: true
         type: string
-      backend_image_name:
+      api_image_name:
         required: true
         type: string
       worker_image_name:
@@ -46,11 +46,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create backend image tags and labels
-        id: backend-meta
+      - name: Create api image tags and labels
+        id: api-meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ inputs.registry }}/${{ inputs.backend_image_name }}
+          images: ${{ inputs.registry }}/${{ inputs.api_image_name }}
           tags: |
             type=raw,value=experimental,enable=${{ inputs.publish_experimental }}
             type=raw,value=latest,enable=${{ inputs.publish_release }}
@@ -65,8 +65,8 @@ jobs:
           build-args: |
             JAR_FILE=build/libs/lekkeratlas-backend.jar
             SPRING_PROFILES_ACTIVE=prod,backend
-          tags: ${{ steps.backend-meta.outputs.tags }}
-          labels: ${{ steps.backend-meta.outputs.labels }}
+          tags: ${{ steps.api-meta.outputs.tags }}
+          labels: ${{ steps.api-meta.outputs.labels }}
 
       - name: Create worker image tags and labels
         id: worker-meta
