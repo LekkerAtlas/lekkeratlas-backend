@@ -1,0 +1,91 @@
+name: Publish application images
+
+on:
+  workflow_call:
+    inputs:
+      registry:
+        required: true
+        type: string
+      backend_image_name:
+        required: true
+        type: string
+      worker_image_name:
+        required: true
+        type: string
+      publish_experimental:
+        required: true
+        type: boolean
+      publish_release:
+        required: true
+        type: boolean
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download backend JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-jar
+          path: build/libs
+
+      - name: Download worker JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: worker-jar
+          path: build/libs
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.registry }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract backend Docker metadata
+        id: backend-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ inputs.registry }}/${{ inputs.backend_image_name }}
+          tags: |
+            type=raw,value=experimental,enable=${{ inputs.publish_experimental }}
+            type=raw,value=latest,enable=${{ inputs.publish_release }}
+            type=semver,pattern={{version}},enable=${{ inputs.publish_release }}
+            type=sha
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            JAR_FILE=build/libs/lekkeratlas-backend.jar
+            SPRING_PROFILES_ACTIVE=prod,backend
+          tags: ${{ steps.backend-meta.outputs.tags }}
+          labels: ${{ steps.backend-meta.outputs.labels }}
+
+      - name: Extract worker Docker metadata
+        id: worker-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ inputs.registry }}/${{ inputs.worker_image_name }}
+          tags: |
+            type=raw,value=experimental,enable=${{ inputs.publish_experimental }}
+            type=raw,value=latest,enable=${{ inputs.publish_release }}
+            type=semver,pattern={{version}},enable=${{ inputs.publish_release }}
+            type=sha
+
+      - name: Build and push worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            JAR_FILE=build/libs/lekkeratlas-worker.jar
+            SPRING_PROFILES_ACTIVE=prod,worker
+          tags: ${{ steps.worker-meta.outputs.tags }}
+          labels: ${{ steps.worker-meta.outputs.labels }}
