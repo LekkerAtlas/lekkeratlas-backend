@@ -51,6 +51,8 @@ public class WorkCommandProducer {
                 envelope
         );
 
+        // TODO Add to db
+
         return commandId;
     }
 }
