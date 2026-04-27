@@ -59,6 +59,26 @@ jobs:
       - name: Build executable JARs
         run: ./gradlew bootJarBackend bootJarWorker
 
+      - name: Test build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          build-args: |
+            JAR_FILE=build/libs/lekkeratlas-backend.jar
+            SPRING_PROFILES_ACTIVE=prod,backend
+          tags: test/lekkeratlas-backend:ci
+
+      - name: Test build worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          build-args: |
+            JAR_FILE=build/libs/lekkeratlas-worker.jar
+            SPRING_PROFILES_ACTIVE=prod,worker
+          tags: test/lekkeratlas-worker:ci
+
       - name: Upload backend JAR artifact
         uses: actions/upload-artifact@v4
         with:
