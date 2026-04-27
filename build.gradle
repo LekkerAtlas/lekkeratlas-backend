@@ -3,9 +3,16 @@ plugins {
 	id 'org.springframework.boot' version '4.0.5'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
+import org.springframework.boot.gradle.tasks.bundling.BootJar
 
 group = 'nl.lekkeratlas'
-version = '0.0.1-SNAPSHOT'
+
+String rawVersion = System.getenv('VERSION')
+		?: System.getenv('GITHUB_REF_NAME')
+		?: '0.0.0-SNAPSHOT'
+
+version = rawVersion.replaceFirst(/^v\.?/, '')
+
 description = 'lekkeratlas-backend'
 
 java {
@@ -28,10 +35,39 @@ dependencies {
 
 	implementation 'org.apache.httpcomponents.client5:httpclient5'
 
+	// Queue
+
+	implementation("org.springframework.boot:spring-boot-starter-amqp")
+	implementation("com.fasterxml.jackson.core:jackson-databind")
+
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+tasks.named('bootJar') {
+	enabled = false
+}
+
+tasks.register('bootJarBackend', BootJar) {
+	group = 'build'
+	description = 'Builds the backend API executable JAR'
+
+	mainClass = 'nl.lekkeratlas.backendapi.LekkeratlasBackendApplication'
+	archiveFileName = 'lekkeratlas-backend.jar'
+	classpath = sourceSets.main.runtimeClasspath
+	targetJavaVersion = JavaVersion.VERSION_21
+}
+
+tasks.register('bootJarWorker', BootJar) {
+	group = 'build'
+	description = 'Builds the worker executable JAR'
+
+	mainClass = 'nl.lekkeratlas.worker.WorkerApplication'
+	archiveFileName = 'lekkeratlas-worker.jar'
+	classpath = sourceSets.main.runtimeClasspath
+	targetJavaVersion = JavaVersion.VERSION_21
 }

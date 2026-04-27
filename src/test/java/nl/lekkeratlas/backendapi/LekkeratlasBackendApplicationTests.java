@@ -1,4 +1,4 @@
-package nl.lekkeratlas.lekkeratlasbackend;
+package nl.lekkeratlas.backendapi;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Disabled;
