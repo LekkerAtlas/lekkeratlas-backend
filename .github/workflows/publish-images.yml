@@ -1,57 +1,91 @@
-name: Build and publish application images
+name: Publish application images
 
 on:
-  pull_request:
-  push:
-    branches: [ "main" ]
-  release:
-    types: [ published ]
-  workflow_dispatch:
-
-env:
-  REGISTRY: ghcr.io
-  BACKEND_IMAGE_NAME: ${{ github.repository }}-backend
-  WORKER_IMAGE_NAME: ${{ github.repository }}-worker
+  workflow_call:
+    inputs:
+      registry:
+        required: true
+        type: string
+      backend_image_name:
+        required: true
+        type: string
+      worker_image_name:
+        required: true
+        type: string
+      publish_experimental:
+        required: true
+        type: boolean
+      publish_release:
+        required: true
+        type: boolean
 
 jobs:
-  publish-mode:
+  publish-application-images-to-registry:
     runs-on: ubuntu-latest
 
-    outputs:
-      publish_experimental: ${{ steps.publish-mode.outputs.publish_experimental }}
-      publish_release: ${{ steps.publish-mode.outputs.publish_release }}
-
     steps:
-      - name: Determine publish mode
-        id: publish-mode
-        run: |
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "publish_experimental=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "publish_experimental=false" >> "$GITHUB_OUTPUT"
-          fi
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-          if [[ "${{ github.event_name }}" == "release" && "${{ github.event.release.tag_name }}" == v* ]]; then
-            echo "publish_release=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "publish_release=false" >> "$GITHUB_OUTPUT"
-          fi
+      - name: Download backend JAR from verification job
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-jar
+          path: build/libs
 
-  verify:
-    uses: ./.github/workflows/verify-application-images.yml
-    permissions:
-      contents: read
+      - name: Download worker JAR from verification job
+        uses: actions/download-artifact@v4
+        with:
+          name: worker-jar
+          path: build/libs
 
-  publish:
-    needs: [ publish-mode, verify ]
-    if: needs.publish-mode.outputs.publish_experimental == 'true' || needs.publish-mode.outputs.publish_release == 'true'
-    uses: ./.github/workflows/publish-application-images.yml
-    permissions:
-      contents: read
-      packages: write
-    with:
-      registry: ghcr.io
-      backend_image_name: ${{ github.repository }}-backend
-      worker_image_name: ${{ github.repository }}-worker
-      publish_experimental: ${{ needs.publish-mode.outputs.publish_experimental == 'true' }}
-      publish_release: ${{ needs.publish-mode.outputs.publish_release == 'true' }}
+      - name: Log in to container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.registry }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create backend image tags and labels
+        id: backend-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ inputs.registry }}/${{ inputs.backend_image_name }}
+          tags: |
+            type=raw,value=experimental,enable=${{ inputs.publish_experimental }}
+            type=raw,value=latest,enable=${{ inputs.publish_release }}
+            type=semver,pattern={{version}},enable=${{ inputs.publish_release }}
+            type=sha
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            JAR_FILE=build/libs/lekkeratlas-backend.jar
+            SPRING_PROFILES_ACTIVE=prod,backend
+          tags: ${{ steps.backend-meta.outputs.tags }}
+          labels: ${{ steps.backend-meta.outputs.labels }}
+
+      - name: Create worker image tags and labels
+        id: worker-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ inputs.registry }}/${{ inputs.worker_image_name }}
+          tags: |
+            type=raw,value=experimental,enable=${{ inputs.publish_experimental }}
+            type=raw,value=latest,enable=${{ inputs.publish_release }}
+            type=semver,pattern={{version}},enable=${{ inputs.publish_release }}
+            type=sha
+
+      - name: Build and push worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            JAR_FILE=build/libs/lekkeratlas-worker.jar
+            SPRING_PROFILES_ACTIVE=prod,worker
+          tags: ${{ steps.worker-meta.outputs.tags }}
+          labels: ${{ steps.worker-meta.outputs.labels }}
