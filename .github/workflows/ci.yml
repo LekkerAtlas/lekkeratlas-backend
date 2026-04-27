@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [ "main" ]
+  release:
+    types: [ published ]
+  workflow_dispatch:
+
+jobs:
+  decide-publishing:
+    runs-on: ubuntu-latest
+
+    outputs:
+      publish_experimental: ${{ steps.mode.outputs.publish_experimental }}
+      publish_release: ${{ steps.mode.outputs.publish_release }}
+
+    steps:
+      - name: Decide which image tags should be published
+        id: mode
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "publish_experimental=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish_experimental=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [[ "${{ github.event_name }}" == "release" && "${{ github.event.release.tag_name }}" == v* ]]; then
+            echo "publish_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  verify-application-images:
+    uses: ./.github/workflows/verify-images.yml
+    permissions:
+      contents: read
+
+  publish-application-images:
+    needs: [ decide-publishing, verify-application-images ]
+    if: needs.decide-publishing.outputs.publish_experimental == 'true' || needs.decide-publishing.outputs.publish_release == 'true'
+    uses: ./.github/workflows/publish-images.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      registry: ghcr.io
+      backend_image_name: ${{ github.repository }}-backend
+      worker_image_name: ${{ github.repository }}-worker
+      publish_experimental: ${{ needs.decide-publishing.outputs.publish_experimental == 'true' }}
+      publish_release: ${{ needs.decide-publishing.outputs.publish_release == 'true' }}

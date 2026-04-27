@@ -1,23 +1,18 @@
-FROM eclipse-temurin:21-jdk AS builder
-WORKDIR /app
-
-COPY gradlew gradlew
-COPY gradle gradle
-COPY build.gradle build.gradle
-COPY settings.gradle settings.gradle
-COPY src src
-
-RUN chmod +x ./gradlew
-RUN ./gradlew bootJar --no-daemon
-
 FROM eclipse-temurin:21-jre
+
 WORKDIR /app
 
 RUN addgroup --system spring && adduser --system --ingroup spring spring
+
+ARG JAR_FILE
+ARG SPRING_PROFILES_ACTIVE=prod
+
+COPY ${JAR_FILE} /app/application.jar
+
+RUN chown spring:spring /app/application.jar
+
 USER spring:spring
 
-COPY --from=builder /app/build/libs/*.jar /app/application.jar
+ENV SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE}
 
-EXPOSE 8080
-
-ENTRYPOINT ["java", "-jar", "/app/application.jar", "--spring.profiles.active=prod"]
+ENTRYPOINT ["java", "-jar", "/app/application.jar"]

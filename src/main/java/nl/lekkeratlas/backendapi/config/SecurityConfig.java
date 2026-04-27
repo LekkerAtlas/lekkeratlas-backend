@@ -1,4 +1,4 @@
-package nl.lekkeratlas.lekkeratlasbackend.config;
+package nl.lekkeratlas.backendapi.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

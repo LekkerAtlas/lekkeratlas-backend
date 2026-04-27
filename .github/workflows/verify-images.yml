@@ -1,0 +1,60 @@
+name: Verify application images
+
+on:
+  workflow_call:
+
+jobs:
+  build-and-test-application-images:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21 with Gradle cache
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Run Gradle verification
+        run: ./gradlew clean check
+
+      - name: Build backend and worker JARs
+        run: ./gradlew bootJarBackend bootJarWorker
+
+      - name: Verify backend Docker image can build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          build-args: |
+            JAR_FILE=build/libs/lekkeratlas-backend.jar
+            SPRING_PROFILES_ACTIVE=prod,backend
+          tags: local/lekkeratlas-backend:verify
+
+      - name: Verify worker Docker image can build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          build-args: |
+            JAR_FILE=build/libs/lekkeratlas-worker.jar
+            SPRING_PROFILES_ACTIVE=prod,worker
+          tags: local/lekkeratlas-worker:verify
+
+      - name: Upload backend JAR for publishing
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: build/libs/lekkeratlas-backend.jar
+
+      - name: Upload worker JAR for publishing
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-jar
+          path: build/libs/lekkeratlas-worker.jar
