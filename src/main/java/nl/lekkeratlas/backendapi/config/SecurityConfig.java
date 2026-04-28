@@ -16,11 +16,6 @@ import java.util.Optional;
 
 @Configuration
 public class SecurityConfig {
-    @Value("${app.authentik.issuer-uri}")
-    private String issuerUri;
-
-    @Value("${app.authentik.host}")
-    private String authentikHost;
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) {
@@ -50,19 +45,11 @@ public class SecurityConfig {
             Components components = Optional.ofNullable(openApi.getComponents())
                     .orElseGet(Components::new);
 
-            components.addSecuritySchemes("oauth2", new SecurityScheme()
-                    .type(SecurityScheme.Type.OAUTH2)
-                    .flows(new OAuthFlows()
-                            .authorizationCode(new OAuthFlow()
-                                    .authorizationUrl(authentikHost + "/application/o/authorize/") // TODO Improve
-                                    .tokenUrl(authentikHost + "/application/o/token/") // TODO Improve
-                                    .scopes(new Scopes()
-                                            .addString("openid", "OpenID Connect") // TODO Improve
-                                            .addString("profile", "User profile") // TODO Improve
-                                            .addString("email", "Email") // TODO Improve
-                                    )
-                            )
-                    )
+            components.addSecuritySchemes("bearerAuth", new SecurityScheme()
+                    .type(SecurityScheme.Type.HTTP)
+                    .scheme("bearer")
+                    .bearerFormat("JWT")
+                    .description("Paste a JWT access token from the identity provider. Use the value as: Bearer <access_token>.")
             );
 
             openApi.components(components);
@@ -70,7 +57,7 @@ public class SecurityConfig {
                 if (path.startsWith("/api/")) {
                     pathItem.readOperations().forEach(operation ->
                             operation.addSecurityItem(
-                                    new SecurityRequirement().addList("oauth2")
+                                    new SecurityRequirement().addList("bearerAuth")
                             )
                     );
                 }
@@ -89,9 +76,8 @@ public class SecurityConfig {
 
                                 Authentication:
                                 - All /api/** routes require OAuth2.
-                                - Uses Authorization Code Flow with PKCE.
-                                - Public clients do NOT need a client secret.
-                                - Obtain an access token via your identity provider.
+                                - Uses Bearer JWT access tokens.
+                                - Obtain a JWT access token via your identity provider.
                                 - Call the API with: Authorization: Bearer <access_token>
                                 """));
     }
