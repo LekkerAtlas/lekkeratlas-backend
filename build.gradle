@@ -47,6 +47,10 @@ dependencies {
 	// Youtube scraper
 
 	implementation("io.github.david-auk:youtube-scraper:0.0.1")
+
+	// OpenAPI
+
+	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5")
 }
 
 tasks.named('test') {
