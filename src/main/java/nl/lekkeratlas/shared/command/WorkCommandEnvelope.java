@@ -1,5 +1,9 @@
 package nl.lekkeratlas.shared.command;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import nl.lekkeratlas.shared.model.queue.QueueJob;
+import nl.lekkeratlas.shared.model.queue.QueueJobType;
+
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -13,8 +17,16 @@ import java.util.UUID;
 public record WorkCommandEnvelope(
         UUID commandId,
         UUID parentCommandId,
-        WorkCommandType type,
+        QueueJobType type,
         Map<String, Object> payload,
         Instant requestedAt
 ) {
+        public WorkCommandEnvelope(QueueJob queueJob) {
+                this(
+                        queueJob.getId(),
+                        queueJob.getParentJob() != null ? queueJob.getParentJob().getId() : null,
+                        queueJob.getType(),
+                        queueJob.getPayload(),
+                        Instant.now());
+        }
 }

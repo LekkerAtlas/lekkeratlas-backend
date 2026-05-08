@@ -1,40 +1,41 @@
 package nl.lekkeratlas.worker.scraper;
 
-import com.github.davidauk.client.YoutubeClient;
-import com.github.davidauk.model.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.github.davidauk.youtubescraper.client.YoutubeClient;
+import com.github.davidauk.youtubescraper.model.ChannelId;
+import com.github.davidauk.youtubescraper.model.ChannelOverviewResponse;
+import com.github.davidauk.youtubescraper.model.ChannelRequest;
+import com.github.davidauk.youtubescraper.model.ChannelSort;
+import com.github.davidauk.youtubescraper.model.content.ContentType;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.List;
 
 /**
  * Temporary placeholder scraper.
- *
+ * <p>
  * Replace this with your YouTube channel scraping logic.
  */
 @Component
 public class ChannelScraper {
 
-    private static final Logger logger = LoggerFactory.getLogger(ChannelScraper.class);
+        private final YoutubeClient client;
 
-    public List<String> findVideoUrls(String channelId) throws IOException, InterruptedException {
+        public ChannelScraper(YoutubeClient client) {
+                this.client = client;
+        }
 
-        YoutubeClient client = new YoutubeClient();
+        public ChannelOverviewResponse findVideoIds(String channelId) throws IOException, InterruptedException {
 
-        Channel channel = new Channel(channelId);
+                ChannelId channel = new ChannelId(channelId);
 
-        logger.info("Fetching videos from channel {}", channel);
-
-        // The third argument can be a channel ID, username, or handle (e.g. "@LinusTechTips")
-        return client.getChannel(channel, new ChannelRequest(
-                5,
-                Duration.ofSeconds(1),
-                null,
-                ChannelSort.NEWEST,
-                ContentType.VIDEOS
-        )).stream().map(Video::id).toList();
-    }
+                // The third argument can be a channel ID, username, or handle (e.g. "@LinusTechTips")
+                return client.getChannel(channel, new ChannelRequest(
+                        null,
+                        Duration.ofSeconds(1),
+                        null,
+                        ChannelSort.NEWEST,
+                        ContentType.VIDEOS
+                ));
+        }
 }
