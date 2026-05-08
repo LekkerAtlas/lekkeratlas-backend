@@ -46,11 +46,16 @@ dependencies {
 
 	// Youtube scraper
 
-	implementation("io.github.david-auk:youtube-scraper:0.0.1")
+	implementation("io.github.david-auk:youtube-scraper:0.0.13")
 
 	// OpenAPI
 
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5")
+
+	// Fluid JDBC
+
+	implementation("io.github.david-auk:fluid-jdbc:0.1.7")
+	implementation("org.postgresql:postgresql:42.7.11")
 }
 
 tasks.named('test') {
