@@ -8,7 +8,6 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springdoc.core.customizers.OpenApiCustomizer;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -16,6 +15,9 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 import java.util.Optional;
@@ -25,14 +27,19 @@ public class SecurityConfig {
 
         private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
 
-        @Value("${app.cors.allowed-origins:http://localhost,http://localhost:5173}")
-        private List<String> allowedOrigins;
+        @Bean
+        CorsConfigurationSource corsConfigurationSource() {
+                CorsConfiguration publicConfiguration = new CorsConfiguration();
+                publicConfiguration.setAllowedOriginPatterns(List.of("*"));
+                publicConfiguration.setAllowedMethods(List.of("*"));
+                publicConfiguration.setAllowedHeaders(List.of("*"));
+                publicConfiguration.setAllowCredentials(false);
 
-        @Value("${app.cors.allowed-methods:GET,POST,PUT,PATCH,DELETE,OPTIONS}")
-        private List<String> allowedMethods;
+                UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+                source.registerCorsConfiguration("/**", publicConfiguration);
 
-        @Value("${app.cors.allowed-headers:Authorization,Content-Type,X-Authentik-Webhook-Secret}")
-        private List<String> allowedHeaders;
+                return source;
+        }
 
         @Bean
         SecurityFilterChain authentikWebhookSecurityFilterChain(
