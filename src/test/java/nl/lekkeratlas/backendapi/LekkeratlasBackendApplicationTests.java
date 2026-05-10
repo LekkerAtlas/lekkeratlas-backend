@@ -16,6 +16,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
                 "spring.rabbitmq.listener.simple.auto-startup=false",
                 "app.webhooks.authentik.secret=test-secret",
                 "app.webhooks.authentik.debug=false",
+                "app.webhooks.authentik.allowed-source-cidrs=127.0.0.1/32,::1/128,172.16.0.0/12,10.0.0.0/8,192.168.0.0/16",
         }
 )
 @ActiveProfiles("backend")
