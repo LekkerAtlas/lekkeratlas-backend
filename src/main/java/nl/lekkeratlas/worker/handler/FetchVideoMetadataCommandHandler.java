@@ -54,15 +54,12 @@ public class FetchVideoMetadataCommandHandler {
         }
 
         // TODO Migrate to sub methods
-        // TODO Remove duplicate logic/code
         public void handle(
                 WorkCommandEnvelope envelope,
                 FetchVideoMetadataCommand command
         ) throws QueueJobException {
                 QueueJob scrapeVideoQueueJob;
                 String videoId = command.videoId();
-
-                String errorMessage = "Failed to scrape video: " + videoId;
 
                 try (Connection connection = Database.getConnection()) {
 
@@ -76,6 +73,9 @@ public class FetchVideoMetadataCommandHandler {
                 }
 
                 Video videoMetadata;
+                String title;
+                String description;
+                Instant publishedAt;
 
                 try {
                         workCommandUpdateProducer.update(
@@ -92,6 +92,19 @@ public class FetchVideoMetadataCommandHandler {
                                         "Channel not found: " + videoId
                                 );
                         }
+
+                        title = videoMetadata.getTitle();
+                        description = videoMetadata.getDescription();
+                        publishedAt = videoMetadata.getPublishedAt();
+
+                        if (title == null || title.isEmpty() || publishedAt == null) {
+                                throw new FailedQueueJobException(
+                                        scrapeVideoQueueJob,
+                                        "Scraped video data is missing a required value",
+                                        "Missing essential data from the scraped video data"
+                                );
+                        }
+
                 } catch (IOException e) {
                         throw new FailedQueueJobException(scrapeVideoQueueJob, e);
                 } catch (InterruptedException e) {
@@ -123,10 +136,10 @@ public class FetchVideoMetadataCommandHandler {
                                 Content content = new Content(
                                         UUID.randomUUID(),
                                         ContentType.OTHER,
-                                        videoMetadata.getTitle(),
-                                        videoMetadata.getDescription(),
+                                        title,
+                                        description,
                                         true,
-                                        videoMetadata.getPublishedAt(),
+                                        publishedAt,
                                         Instant.now(),
                                         Instant.now()
                                 );
