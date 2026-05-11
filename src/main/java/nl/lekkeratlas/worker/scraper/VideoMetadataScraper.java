@@ -21,6 +21,8 @@ public class VideoMetadataScraper {
         }
 
         public Video scrape(String videoId) throws IOException, InterruptedException {
-                return client.getVideo(videoId);
+                YoutubeClient newYoutubeClient = new YoutubeClient();
+
+                return newYoutubeClient.getVideo(videoId);
         }
 }
