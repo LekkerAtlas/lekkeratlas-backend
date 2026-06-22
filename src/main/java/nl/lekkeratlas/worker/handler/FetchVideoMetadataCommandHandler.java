@@ -1,6 +1,18 @@
 package nl.lekkeratlas.worker.handler;
 
+import static nl.lekkeratlas.shared.model.queue.QueueJobStatus.COMPLETED;
+
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.time.Instant;
+import java.util.UUID;
+
+import org.springframework.amqp.AmqpRejectAndDontRequeueException;
+import org.springframework.stereotype.Component;
+
 import com.github.davidauk.youtubescraper.model.content.Video;
+
 import io.github.david.auk.fluid.jdbc.components.Database;
 import io.github.david.auk.fluid.jdbc.components.daos.Dao;
 import io.github.david.auk.fluid.jdbc.factories.DAOFactory;
@@ -19,16 +31,6 @@ import nl.lekkeratlas.worker.exceptions.QueueJobException;
 import nl.lekkeratlas.worker.scraper.VideoMetadataScraper;
 import nl.lekkeratlas.worker.service.QueueJobLookupService;
 import nl.lekkeratlas.worker.service.UserLookupService;
-import org.springframework.amqp.AmqpRejectAndDontRequeueException;
-import org.springframework.stereotype.Component;
-
-import java.io.IOException;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.time.Instant;
-import java.util.UUID;
-
-import static nl.lekkeratlas.shared.model.queue.QueueJobStatus.COMPLETED;
 
 /**
  * Handles video imports.

@@ -1,11 +1,11 @@
 package nl.lekkeratlas.shared.exceptions;
 
+import static nl.lekkeratlas.backendapi.GlobalExceptionHandler.MESSAGE_KEY;
+
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-
-import nl.lekkeratlas.backendapi.GlobalExceptionHandler;
 
 public abstract class HttpResponsableException extends Exception {
 
@@ -21,7 +21,7 @@ public abstract class HttpResponsableException extends Exception {
 
                 return ResponseEntity
                                 .status(httpStatus)
-                                .body(Map.of(GlobalExceptionHandler.MESSAGE_KEY,
+                                .body(Map.of(MESSAGE_KEY,
                                                 message));
         }
 

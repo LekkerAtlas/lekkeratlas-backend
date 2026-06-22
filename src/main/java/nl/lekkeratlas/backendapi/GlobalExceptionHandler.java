@@ -1,5 +1,6 @@
 package nl.lekkeratlas.backendapi;
 
+import java.io.Serializable;
 import java.sql.SQLException;
 import java.util.Map;
 
@@ -16,7 +17,7 @@ import nl.lekkeratlas.shared.exceptions.HttpResponsableException;
 public class GlobalExceptionHandler {
         public static final String MESSAGE_KEY = "message";
 
-        private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+        private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
         private static final ResponseEntity<Map<String, String>> internalServerErrorDefualtResponse = ResponseEntity
                         .status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -25,7 +26,7 @@ public class GlobalExceptionHandler {
         @ExceptionHandler(SQLException.class)
         public ResponseEntity<Map<String, String>> handleSqlException(SQLException ex) {
                 // Log the internal error for debugging purposes
-                logger.error("Uncatched SQLException", ex);
+                LOGGER.error("Uncatched SQLException", ex);
 
                 // Hide details from the client
                 return internalServerErrorDefualtResponse;
@@ -34,7 +35,7 @@ public class GlobalExceptionHandler {
         @ExceptionHandler(NoSuchFieldException.class)
         public ResponseEntity<Map<String, String>> handleNoSuchFieldException(NoSuchFieldException ex) {
                 // Log the internal error for debugging purposes
-                logger.error("Uncatched reflection error", ex);
+                LOGGER.error("Uncatched reflection error", ex);
 
                 // Hide details from the client
                 return internalServerErrorDefualtResponse;
