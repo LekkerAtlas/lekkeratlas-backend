@@ -1,11 +1,11 @@
 package nl.lekkeratlas.backendapi.web;
 
+import java.util.UUID;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 import nl.lekkeratlas.backendapi.exceptions.JWTException;
-
-import java.util.UUID;
 
 public class Utils {
         private Utils() {

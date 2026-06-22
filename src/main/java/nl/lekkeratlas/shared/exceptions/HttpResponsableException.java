@@ -4,6 +4,7 @@ import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+
 import nl.lekkeratlas.backendapi.GlobalExceptionHandler;
 
 public abstract class HttpResponsableException extends Exception {

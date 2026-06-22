@@ -1,5 +1,9 @@
 package nl.lekkeratlas.shared.model.content.contentplatform;
 
+import java.time.Instant;
+import java.util.Objects;
+import java.util.UUID;
+
 import io.github.david.auk.fluid.jdbc.annotations.table.TableName;
 import io.github.david.auk.fluid.jdbc.annotations.table.constructor.TableConstructor;
 import io.github.david.auk.fluid.jdbc.annotations.table.field.ForeignKey;
@@ -7,10 +11,6 @@ import io.github.david.auk.fluid.jdbc.annotations.table.field.PrimaryKey;
 import io.github.david.auk.fluid.jdbc.annotations.table.field.TableColumn;
 import io.github.david.auk.fluid.jdbc.components.tables.TableEntity;
 import nl.lekkeratlas.shared.model.user.User;
-
-import java.time.Instant;
-import java.util.Objects;
-import java.util.UUID;
 
 @TableName("content_platform")
 public class ContentPlatform implements TableEntity {

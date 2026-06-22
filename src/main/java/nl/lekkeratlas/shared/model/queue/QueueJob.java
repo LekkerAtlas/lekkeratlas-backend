@@ -34,7 +34,7 @@ public class QueueJob implements TableEntity, Serializable {
 
         /**
          * Do not serialize the user for privacy sake
-         *
+         * <p>
          * Make User serialize if this is restrictive
          */
         @ForeignKey

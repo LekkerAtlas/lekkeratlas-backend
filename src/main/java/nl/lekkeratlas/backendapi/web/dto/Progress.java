@@ -1,13 +1,12 @@
 package nl.lekkeratlas.backendapi.web.dto;
 
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
-
 import nl.lekkeratlas.shared.model.queue.QueueJobStatus;
-
-import java.util.List;
-import java.util.UUID;
-import java.util.Objects;
 
 public record Progress(
                 @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID id,

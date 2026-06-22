@@ -1,5 +1,18 @@
 package nl.lekkeratlas.backendapi.web.channel;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import io.github.david.auk.fluid.jdbc.components.Database;
 import io.github.david.auk.fluid.jdbc.components.daos.Dao;
 import io.github.david.auk.fluid.jdbc.components.daos.QueryBuilder;
@@ -15,15 +28,6 @@ import nl.lekkeratlas.shared.model.queue.QueueJob;
 import nl.lekkeratlas.shared.model.queue.QueueJobType;
 import nl.lekkeratlas.shared.model.user.User;
 import nl.lekkeratlas.shared.rabbit.WorkCommandProducer;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import org.springframework.web.bind.annotation.*;
-
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/channels")

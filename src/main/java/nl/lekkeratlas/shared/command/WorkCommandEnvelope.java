@@ -1,12 +1,12 @@
 package nl.lekkeratlas.shared.command;
 
-import nl.lekkeratlas.shared.model.queue.QueueJob;
-import nl.lekkeratlas.shared.model.queue.QueueJobType;
-
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
+
+import nl.lekkeratlas.shared.model.queue.QueueJob;
+import nl.lekkeratlas.shared.model.queue.QueueJobType;
 
 /**
  * Generic RabbitMQ command wrapper.

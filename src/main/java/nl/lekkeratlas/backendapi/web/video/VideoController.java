@@ -1,8 +1,9 @@
 package nl.lekkeratlas.backendapi.web.video;
 
-import nl.lekkeratlas.shared.rabbit.WorkCommandProducer;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import nl.lekkeratlas.shared.rabbit.WorkCommandProducer;
 
 @RestController
 @RequestMapping("/api/videos")

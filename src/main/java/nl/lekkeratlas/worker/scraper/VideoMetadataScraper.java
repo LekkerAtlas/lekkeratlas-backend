@@ -1,10 +1,11 @@
 package nl.lekkeratlas.worker.scraper;
 
-import com.github.davidauk.youtubescraper.client.YoutubeClient;
-import com.github.davidauk.youtubescraper.model.content.Video;
+import java.io.IOException;
+
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
+import com.github.davidauk.youtubescraper.client.YoutubeClient;
+import com.github.davidauk.youtubescraper.model.content.Video;
 
 /**
  * Temporary placeholder scraper.

@@ -1,14 +1,15 @@
 package nl.lekkeratlas.worker.service;
 
+import java.sql.Connection;
+import java.util.UUID;
+
+import org.springframework.amqp.AmqpRejectAndDontRequeueException;
+import org.springframework.stereotype.Service;
+
 import io.github.david.auk.fluid.jdbc.components.daos.Dao;
 import io.github.david.auk.fluid.jdbc.factories.DAOFactory;
 import nl.lekkeratlas.shared.model.queue.QueueJob;
 import nl.lekkeratlas.shared.model.queue.QueueJobStatus;
-import org.springframework.amqp.AmqpRejectAndDontRequeueException;
-import org.springframework.stereotype.Service;
-
-import java.sql.Connection;
-import java.util.UUID;
 
 @Service
 public class QueueJobLookupService {
