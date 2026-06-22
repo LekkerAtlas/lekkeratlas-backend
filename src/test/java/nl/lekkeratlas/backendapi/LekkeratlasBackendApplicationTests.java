@@ -8,10 +8,13 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest(classes = LekkeratlasBackendApplication.class, properties = {
-                "spring.autoconfigure.exclude=" +
-                                "org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration,"
-                                +
-                                "org.springframework.boot.security.oauth2.server.resource.autoconfigure.servlet.OAuth2ResourceServerAutoConfiguration",
+                "debug=true",
+                "logging.level.org.springframework=INFO",
+                "logging.level.org.springframework.boot.autoconfigure=DEBUG",
+
+                "app.authentik.host=http://localhost:9000",
+                "app.authentik.issuer-uri=http://localhost:9000/application/o/lekker-atlas/",
+
                 "spring.rabbitmq.listener.simple.auto-startup=false",
                 "app.webhooks.authentik.secret=test-secret",
                 "app.webhooks.authentik.debug=false",
@@ -19,7 +22,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 })
 @ActiveProfiles("backend")
 class LekkeratlasBackendApplicationTests {
-
         @MockitoBean
         private ClientRegistrationRepository clientRegistrationRepository;
 

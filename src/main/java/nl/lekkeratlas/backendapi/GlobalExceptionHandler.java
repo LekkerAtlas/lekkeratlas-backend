@@ -22,7 +22,7 @@ public class GlobalExceptionHandler {
                         .status(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body(Map.of(MESSAGE_KEY, "An unexpected internal error occurred."));
 
-        @ExceptionHandler(NoSuchFieldException.class)
+        @ExceptionHandler(SQLException.class)
         public ResponseEntity<Map<String, String>> handleSqlException(SQLException ex) {
                 // Log the internal error for debugging purposes
                 logger.error("Uncatched SQLException", ex);
