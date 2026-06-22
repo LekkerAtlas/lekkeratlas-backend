@@ -10,22 +10,10 @@ import java.util.UUID;
 import java.util.Objects;
 
 public record Progress(
-        @NotNull
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
-        UUID id,
-
-        @NotNull
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
-        QueueJobStatus latestStatus,
-
-        @NotNull
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
-        List<ProgressStatusEvent> events,
-
-        @NotNull
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
-        List<Progress> childProgresses
-) {
+                @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID id,
+                @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) QueueJobStatus latestStatus,
+                @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<ProgressStatusEvent> events,
+                @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Progress> childProgresses) {
         public Progress {
                 Objects.requireNonNull(id, "id");
                 Objects.requireNonNull(latestStatus, "latestStatus");

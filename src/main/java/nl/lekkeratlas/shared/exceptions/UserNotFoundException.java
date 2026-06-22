@@ -1,8 +1,10 @@
 package nl.lekkeratlas.shared.exceptions;
 
-public class UserNotFoundException extends Exception {
+import org.springframework.http.HttpStatus;
+
+public class UserNotFoundException extends HttpResponsableException {
 
         public UserNotFoundException(String message) {
-                super(message);
+                super(HttpStatus.NOT_FOUND, message);
         }
 }

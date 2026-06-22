@@ -44,9 +44,9 @@ public class FetchVideoMetadataCommandHandler {
         private final QueueJobLookupService queueJobLookupService;
 
         public FetchVideoMetadataCommandHandler(
-                VideoMetadataScraper videoMetadataScraper,
-                WorkCommandUpdateProducer workCommandUpdateProducer, UserLookupService userLookupService, QueueJobLookupService queueJobLookupService
-        ) {
+                        VideoMetadataScraper videoMetadataScraper,
+                        WorkCommandUpdateProducer workCommandUpdateProducer, UserLookupService userLookupService,
+                        QueueJobLookupService queueJobLookupService) {
                 this.videoMetadataScraper = videoMetadataScraper;
                 this.workCommandUpdateProducer = workCommandUpdateProducer;
                 this.userLookupService = userLookupService;
@@ -55,9 +55,8 @@ public class FetchVideoMetadataCommandHandler {
 
         // TODO Migrate to sub methods
         public void handle(
-                WorkCommandEnvelope envelope,
-                FetchVideoMetadataCommand command
-        ) throws QueueJobException {
+                        WorkCommandEnvelope envelope,
+                        FetchVideoMetadataCommand command) throws QueueJobException {
                 QueueJob scrapeVideoQueueJob;
                 String videoId = command.videoId();
 
@@ -66,7 +65,6 @@ public class FetchVideoMetadataCommandHandler {
                         // Enforce that the necessary values are present
                         userLookupService.requireExistingUser(connection, command.requestedByUserId());
                         scrapeVideoQueueJob = queueJobLookupService.requireQueueJob(connection, envelope.commandId());
-
 
                 } catch (SQLException e) {
                         throw new AmqpRejectAndDontRequeueException(e);
@@ -79,18 +77,16 @@ public class FetchVideoMetadataCommandHandler {
 
                 try {
                         workCommandUpdateProducer.update(
-                                scrapeVideoQueueJob,
-                                QueueJobStatus.RUNNING,
-                                "Beginning scraping video " + command.videoId()
-                        );
+                                        scrapeVideoQueueJob,
+                                        QueueJobStatus.RUNNING,
+                                        "Beginning scraping video " + command.videoId());
                         videoMetadata = videoMetadataScraper.scrape(videoId);
 
                         if (videoMetadata == null) {
                                 throw new FailedQueueJobException(
-                                        scrapeVideoQueueJob,
-                                        "videoMetadata has null value",
-                                        "Channel not found: " + videoId
-                                );
+                                                scrapeVideoQueueJob,
+                                                "videoMetadata has null value",
+                                                "Channel not found: " + videoId);
                         }
 
                         title = videoMetadata.getTitle();
@@ -99,10 +95,9 @@ public class FetchVideoMetadataCommandHandler {
 
                         if (title == null || title.isEmpty() || publishedAt == null) {
                                 throw new FailedQueueJobException(
-                                        scrapeVideoQueueJob,
-                                        "Scraped video data is missing a required value",
-                                        "Missing essential data from the scraped video data"
-                                );
+                                                scrapeVideoQueueJob,
+                                                "Scraped video data is missing a required value",
+                                                "Missing essential data from the scraped video data");
                         }
 
                 } catch (IOException e) {
@@ -111,59 +106,55 @@ public class FetchVideoMetadataCommandHandler {
                         Thread.currentThread().interrupt();
 
                         throw new CanceledQueueJobException(
-                                scrapeVideoQueueJob,
-                                "User interrupted scraping video",
-                                "Video scraping was interrupted for " + videoId
-                        );
+                                        scrapeVideoQueueJob,
+                                        "User interrupted scraping video",
+                                        "Video scraping was interrupted for " + videoId);
                 }
 
                 try (Connection connection = Database.getConnection()) {
 
-                        try (Dao<ContentPlatform, UUID> contentPlatformDao = DAOFactory.createDAO(connection, ContentPlatform.class)) {
+                        try (Dao<ContentPlatform, UUID> contentPlatformDao = DAOFactory.createDAO(connection,
+                                        ContentPlatform.class)) {
                                 if (!contentPlatformDao.existsByPrimaryKey(command.contentPlatformId())) {
                                         throw new FailedQueueJobException(
-                                                scrapeVideoQueueJob,
-                                                "ContentPlatform ID has null value for video " + videoId,
-                                                "Could not find related channel, please inform the administrator"
-                                        );
+                                                        scrapeVideoQueueJob,
+                                                        "ContentPlatform ID has null value for video " + videoId,
+                                                        "Could not find related channel, please inform the administrator");
                                 }
                         }
 
                         try (
-                                Dao<Content, UUID> contentDao = DAOFactory.createDAO(connection, Content.class);
-                                Dao<HostedContent, UUID> hostedContentDao = DAOFactory.createDAO(connection, HostedContent.class)
-                        ) {
+                                        Dao<Content, UUID> contentDao = DAOFactory.createDAO(connection, Content.class);
+                                        Dao<HostedContent, UUID> hostedContentDao = DAOFactory.createDAO(connection,
+                                                        HostedContent.class)) {
                                 Content content = new Content(
-                                        UUID.randomUUID(),
-                                        ContentType.OTHER,
-                                        title,
-                                        description,
-                                        true,
-                                        publishedAt,
-                                        Instant.now(),
-                                        Instant.now()
-                                );
+                                                UUID.randomUUID(),
+                                                ContentType.OTHER,
+                                                title,
+                                                description,
+                                                true,
+                                                publishedAt,
+                                                Instant.now(),
+                                                Instant.now());
 
                                 contentDao.add(content);
 
                                 HostedContent hostedContent = new HostedContent(
-                                        UUID.randomUUID(),
-                                        content,
+                                                UUID.randomUUID(),
+                                                content,
 
-                                        // Insert an empty content platform, the ID is validated
-                                        ContentPlatform.getDummyContentPlatform(command.contentPlatformId()),
-                                        videoMetadata.getId()
-                                );
+                                                // Insert an empty content platform, the ID is validated
+                                                ContentPlatform.getDummyContentPlatform(command.contentPlatformId()),
+                                                videoMetadata.getId());
 
                                 hostedContentDao.add(hostedContent);
                         }
 
                         workCommandUpdateProducer.update(
-                                connection,
-                                scrapeVideoQueueJob,
-                                COMPLETED,
-                                "Saved video metadata for " + videoMetadata.getTitle()
-                        );
+                                        connection,
+                                        scrapeVideoQueueJob,
+                                        COMPLETED,
+                                        "Saved video metadata for " + videoMetadata.getTitle());
                 } catch (SQLException e) {
                         throw new AmqpRejectAndDontRequeueException(e);
                 }

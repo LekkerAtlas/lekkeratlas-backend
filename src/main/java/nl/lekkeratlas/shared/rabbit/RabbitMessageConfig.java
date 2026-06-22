@@ -13,18 +13,17 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMessageConfig {
 
-    @Bean
-    MessageConverter messageConverter() {
-        return new JacksonJsonMessageConverter();
-    }
+        @Bean
+        MessageConverter messageConverter() {
+                return new JacksonJsonMessageConverter();
+        }
 
-    @Bean
-    RabbitTemplate rabbitTemplate(
-            ConnectionFactory connectionFactory,
-            MessageConverter messageConverter
-    ) {
-        RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
-        rabbitTemplate.setMessageConverter(messageConverter);
-        return rabbitTemplate;
-    }
+        @Bean
+        RabbitTemplate rabbitTemplate(
+                        ConnectionFactory connectionFactory,
+                        MessageConverter messageConverter) {
+                RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
+                rabbitTemplate.setMessageConverter(messageConverter);
+                return rabbitTemplate;
+        }
 }

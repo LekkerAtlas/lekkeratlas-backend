@@ -29,13 +29,13 @@ public class ChannelScraper {
 
                 ChannelId channel = new ChannelId(channelId);
 
-                // The third argument can be a channel ID, username, or handle (e.g. "@LinusTechTips")
+                // The third argument can be a channel ID, username, or handle (e.g.
+                // "@LinusTechTips")
                 return client.getChannel(channel, new ChannelRequest(
-                        null,
-                        Duration.ofSeconds(1),
-                        null,
-                        ChannelSort.NEWEST,
-                        ContentType.VIDEOS
-                ));
+                                null,
+                                Duration.ofSeconds(1),
+                                null,
+                                ChannelSort.NEWEST,
+                                ContentType.VIDEOS));
         }
 }

@@ -4,11 +4,10 @@ import io.github.david.auk.fluid.jdbc.annotations.table.TableName;
 import io.github.david.auk.fluid.jdbc.annotations.table.constructor.TableConstructor;
 import io.github.david.auk.fluid.jdbc.annotations.table.constructor.TableInherits;
 import io.github.david.auk.fluid.jdbc.annotations.table.field.TableColumn;
-import io.github.david.auk.fluid.jdbc.components.tables.TableEntity;
 
 @TableName("youtube_channel")
 @TableInherits(ContentVideoPlatform.class)
-public class YoutubeChannel extends ContentVideoPlatform implements TableEntity {
+public class YoutubeChannel extends ContentVideoPlatform {
 
         @TableColumn(columnName = "source_kind")
         private final SourceKind sourceKind;
@@ -17,7 +16,8 @@ public class YoutubeChannel extends ContentVideoPlatform implements TableEntity 
         private final String youtubeChannelId;
 
         @TableConstructor
-        public YoutubeChannel(ContentVideoPlatform contentVideoPlatform, SourceKind sourceKind, String youtubeChannelId) {
+        public YoutubeChannel(ContentVideoPlatform contentVideoPlatform, SourceKind sourceKind,
+                        String youtubeChannelId) {
                 super(contentVideoPlatform);
                 if (sourceKind != SourceKind.YOUTUBE_CHANNEL) {
                         throw new IllegalArgumentException("SourceKind must be YOUTUBE_CHANNEL");

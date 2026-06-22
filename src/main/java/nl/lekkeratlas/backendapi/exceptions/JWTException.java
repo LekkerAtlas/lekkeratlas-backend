@@ -1,8 +1,12 @@
 package nl.lekkeratlas.backendapi.exceptions;
 
-public class JWTException extends Exception {
+import org.springframework.http.HttpStatus;
 
-        public JWTException(String message) {
-                super(message);
+import nl.lekkeratlas.shared.exceptions.HttpResponsableException;
+
+public class JWTException extends HttpResponsableException {
+
+        public JWTException(HttpStatus status, String message) {
+                super(status, message);
         }
 }

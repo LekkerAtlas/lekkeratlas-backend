@@ -1,5 +1,16 @@
 package nl.lekkeratlas.worker.listener;
 
+import java.sql.SQLException;
+import java.util.Objects;
+import java.util.UUID;
+
+import org.apache.commons.lang3.NotImplementedException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.AmqpRejectAndDontRequeueException;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.stereotype.Component;
+
 import io.github.david.auk.fluid.jdbc.components.daos.Dao;
 import io.github.david.auk.fluid.jdbc.factories.DAOFactory;
 import nl.lekkeratlas.shared.command.FetchPlatformContentCommand;
@@ -12,17 +23,7 @@ import nl.lekkeratlas.shared.rabbit.WorkCommandUpdateProducer;
 import nl.lekkeratlas.worker.exceptions.QueueJobException;
 import nl.lekkeratlas.worker.handler.FetchPlatformContentCommandHandler;
 import nl.lekkeratlas.worker.handler.FetchVideoMetadataCommandHandler;
-import org.apache.commons.lang3.NotImplementedException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.amqp.AmqpRejectAndDontRequeueException;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
-
-import java.sql.SQLException;
-import java.util.Objects;
-import java.util.UUID;
 
 /**
  * Generic listener for the single shared work queue.
@@ -40,12 +41,11 @@ public class WorkCommandListener {
 
         private static final Logger logger = LoggerFactory.getLogger(WorkCommandListener.class);
 
-
         public WorkCommandListener(
-                ObjectMapper objectMapper,
-                FetchPlatformContentCommandHandler fetchPlatformContentCommandHandler,
-                FetchVideoMetadataCommandHandler fetchVideoMetadataCommandHandler, WorkCommandUpdateProducer workCommandUpdateProducer
-        ) {
+                        ObjectMapper objectMapper,
+                        FetchPlatformContentCommandHandler fetchPlatformContentCommandHandler,
+                        FetchVideoMetadataCommandHandler fetchVideoMetadataCommandHandler,
+                        WorkCommandUpdateProducer workCommandUpdateProducer) {
                 this.objectMapper = objectMapper;
                 this.fetchPlatformContentCommandHandler = fetchPlatformContentCommandHandler;
                 this.fetchVideoMetadataCommandHandler = fetchVideoMetadataCommandHandler;
@@ -69,10 +69,9 @@ public class WorkCommandListener {
                         }
 
                         workCommandUpdateProducer.update(
-                                queueJobException.getQueueJob(),
-                                queueJobException.getStatus(),
-                                queueJobException.getMessageForEndUser()
-                        );
+                                        queueJobException.getQueueJob(),
+                                        queueJobException.getStatus(),
+                                        queueJobException.getMessageForEndUser());
                 } catch (Exception e) {
 
                         logger.error("Error while handling work command", e);
@@ -87,29 +86,28 @@ public class WorkCommandListener {
                                 logger.error("Failed queue job: {}", queueJob.getId());
 
                                 workCommandUpdateProducer.update(
-                                        queueJob,
-                                        QueueJobStatus.FAILED,
-                                        "There was an internal server error, " +
-                                                "please send this to an administrator: " + e.getMessage()
-                                );
+                                                queueJob,
+                                                QueueJobStatus.FAILED,
+                                                "There was an internal server error, " +
+                                                                "please send this to an administrator: "
+                                                                + e.getMessage());
                         }
                 }
         }
 
-        private void handleFetchPlatformContent(WorkCommandEnvelope envelope) throws QueueJobException, SQLException {
+        private void handleFetchPlatformContent(WorkCommandEnvelope envelope)
+                        throws QueueJobException, SQLException, NoSuchFieldException {
                 FetchPlatformContentCommand command = objectMapper.convertValue(
-                        envelope.payload(),
-                        FetchPlatformContentCommand.class
-                );
+                                envelope.payload(),
+                                FetchPlatformContentCommand.class);
 
                 fetchPlatformContentCommandHandler.handle(envelope, command);
         }
 
         private void handleFetchVideoMetadata(WorkCommandEnvelope envelope) throws QueueJobException {
                 FetchVideoMetadataCommand command = objectMapper.convertValue(
-                        envelope.payload(),
-                        FetchVideoMetadataCommand.class
-                );
+                                envelope.payload(),
+                                FetchVideoMetadataCommand.class);
 
                 fetchVideoMetadataCommandHandler.handle(envelope, command);
         }

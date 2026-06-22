@@ -9,7 +9,6 @@ public abstract class QueueJobException extends Exception {
         private final QueueJob queueJob;
         private final QueueJobStatus status;
 
-
         QueueJobException(QueueJob queueJob, String message, String messageForEndUser, QueueJobStatus status) {
                 super(message);
                 this.messageForEndUser = messageForEndUser;

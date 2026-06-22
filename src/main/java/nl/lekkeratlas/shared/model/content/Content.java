@@ -1,14 +1,14 @@
 package nl.lekkeratlas.shared.model.content;
 
+import java.time.Instant;
+import java.util.Objects;
+import java.util.UUID;
+
 import io.github.david.auk.fluid.jdbc.annotations.table.TableName;
 import io.github.david.auk.fluid.jdbc.annotations.table.constructor.TableConstructor;
 import io.github.david.auk.fluid.jdbc.annotations.table.field.PrimaryKey;
 import io.github.david.auk.fluid.jdbc.annotations.table.field.TableColumn;
 import io.github.david.auk.fluid.jdbc.components.tables.TableEntity;
-
-import java.time.Instant;
-import java.util.Objects;
-import java.util.UUID;
 
 @TableName("content")
 public final class Content implements TableEntity {
@@ -30,9 +30,10 @@ public final class Content implements TableEntity {
         @TableColumn(columnName = "updated_at")
         private final Instant updatedAt;
 
-
+        @SuppressWarnings("java:S107")
         @TableConstructor
-        public Content(UUID id, ContentType type, String title, String description, Boolean showGamesPlayedByDefault, Instant publishedAt, Instant createdAt, Instant updatedAt) {
+        public Content(UUID id, ContentType type, String title, String description, Boolean showGamesPlayedByDefault,
+                        Instant publishedAt, Instant createdAt, Instant updatedAt) {
                 this.id = id;
                 this.type = type;
                 this.title = title;
@@ -77,35 +78,38 @@ public final class Content implements TableEntity {
 
         @Override
         public boolean equals(Object obj) {
-                if (obj == this) return true;
-                if (obj == null || obj.getClass() != this.getClass()) return false;
+                if (obj == this)
+                        return true;
+                if (obj == null || obj.getClass() != this.getClass())
+                        return false;
                 var that = (Content) obj;
                 return Objects.equals(this.id, that.id) &&
-                        Objects.equals(this.type, that.type) &&
-                        Objects.equals(this.title, that.title) &&
-                        Objects.equals(this.description, that.description) &&
-                        Objects.equals(this.showGamesPlayedByDefault, that.showGamesPlayedByDefault) &&
-                        Objects.equals(this.publishedAt, that.publishedAt) &&
-                        Objects.equals(this.createdAt, that.createdAt) &&
-                        Objects.equals(this.updatedAt, that.updatedAt);
+                                Objects.equals(this.type, that.type) &&
+                                Objects.equals(this.title, that.title) &&
+                                Objects.equals(this.description, that.description) &&
+                                Objects.equals(this.showGamesPlayedByDefault, that.showGamesPlayedByDefault) &&
+                                Objects.equals(this.publishedAt, that.publishedAt) &&
+                                Objects.equals(this.createdAt, that.createdAt) &&
+                                Objects.equals(this.updatedAt, that.updatedAt);
         }
 
         @Override
         public int hashCode() {
-                return Objects.hash(id, type, title, description, showGamesPlayedByDefault, publishedAt, createdAt, updatedAt);
+                return Objects.hash(id, type, title, description, showGamesPlayedByDefault, publishedAt, createdAt,
+                                updatedAt);
         }
 
         @Override
         public String toString() {
                 return "Content[" +
-                        "id=" + id + ", " +
-                        "type=" + type + ", " +
-                        "title=" + title + ", " +
-                        "description=" + description + ", " +
-                        "showGamesPlayedByDefault=" + showGamesPlayedByDefault + ", " +
-                        "publishedAt=" + publishedAt + ", " +
-                        "createdAt=" + createdAt + ", " +
-                        "updatedAt=" + updatedAt + ']';
+                                "id=" + id + ", " +
+                                "type=" + type + ", " +
+                                "title=" + title + ", " +
+                                "description=" + description + ", " +
+                                "showGamesPlayedByDefault=" + showGamesPlayedByDefault + ", " +
+                                "publishedAt=" + publishedAt + ", " +
+                                "createdAt=" + createdAt + ", " +
+                                "updatedAt=" + updatedAt + ']';
         }
 
         public void setTitle(String title) {

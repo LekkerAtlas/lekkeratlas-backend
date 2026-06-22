@@ -1,6 +1,10 @@
 package nl.lekkeratlas.shared.rabbit;
 
-import org.springframework.amqp.core.*;
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.DirectExchange;
+import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -13,30 +17,28 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitTopologyConfig {
 
-    @Bean
-    DirectExchange workExchange() {
-        return new DirectExchange(
-                RabbitNames.WORK_EXCHANGE,
-                true,
-                false
-        );
-    }
+        @Bean
+        DirectExchange workExchange() {
+                return new DirectExchange(
+                                RabbitNames.WORK_EXCHANGE,
+                                true,
+                                false);
+        }
 
-    @Bean
-    Queue workQueue() {
-        return QueueBuilder
-                .durable(RabbitNames.WORK_QUEUE)
-                .build();
-    }
+        @Bean
+        Queue workQueue() {
+                return QueueBuilder
+                                .durable(RabbitNames.WORK_QUEUE)
+                                .build();
+        }
 
-    @Bean
-    Binding workBinding(
-            Queue workQueue,
-            DirectExchange workExchange
-    ) {
-        return BindingBuilder
-                .bind(workQueue)
-                .to(workExchange)
-                .with(RabbitNames.WORK_ROUTING_KEY);
-    }
+        @Bean
+        Binding workBinding(
+                        Queue workQueue,
+                        DirectExchange workExchange) {
+                return BindingBuilder
+                                .bind(workQueue)
+                                .to(workExchange)
+                                .with(RabbitNames.WORK_ROUTING_KEY);
+        }
 }

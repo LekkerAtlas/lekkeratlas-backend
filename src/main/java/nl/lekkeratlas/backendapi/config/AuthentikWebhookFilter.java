@@ -21,7 +21,7 @@ import java.util.List;
 @Component
 public class AuthentikWebhookFilter extends OncePerRequestFilter {
 
-        private static final Logger logger = LoggerFactory.getLogger(AuthentikWebhookFilter.class);
+        private static final Logger logging = LoggerFactory.getLogger(AuthentikWebhookFilter.class);
 
         @Value("${app.webhooks.authentik.secret}")
         private String expectedSecret;
@@ -39,28 +39,28 @@ public class AuthentikWebhookFilter extends OncePerRequestFilter {
 
         @Override
         protected void doFilterInternal(
-                HttpServletRequest request,
-                @NonNull HttpServletResponse response,
-                @NonNull FilterChain filterChain
-        ) throws ServletException, IOException {
+                        HttpServletRequest request,
+                        @NonNull HttpServletResponse response,
+                        @NonNull FilterChain filterChain) throws ServletException, IOException {
                 String authorization = request.getHeader("Authorization");
                 String remoteAddress = resolveRemoteAddress(request);
                 if (debugEnabled) {
-                        logger.info("Authentik webhook request received");
-                        logger.info("Method: {}", request.getMethod());
-                        logger.info("URI: {}", request.getRequestURI());
-                        logger.info("Remote address: {}", remoteAddress);
-                        logger.info("Allowed source CIDRs: {}", allowedSourceCidrs);
-                        logger.info("Authorization header present: {}", authorization != null);
+                        logging.info("Authentik webhook request received");
+                        logging.info("Method: {}", request.getMethod());
+                        logging.info("URI: {}", request.getRequestURI());
+                        logging.info("Remote address: {}", remoteAddress);
+                        logging.info("Allowed source CIDRs: {}", allowedSourceCidrs);
+                        logging.info("Authorization header present: {}", authorization != null);
 
                         // Scary
                         if (authorization != null) {
-                                logger.info("Authorization header value: {}", authorization);
+                                logging.info("Authorization header value: {}", authorization);
                         }
                 }
 
                 if (!isAllowedSource(remoteAddress)) {
-                        logger.info("Authentik webhook rejected because source address is not allowed: {}", remoteAddress);
+                        logging.info("Authentik webhook rejected because source address is not allowed: {}",
+                                        remoteAddress);
                         response.sendError(HttpServletResponse.SC_FORBIDDEN);
                         return;
                 }
@@ -68,16 +68,17 @@ public class AuthentikWebhookFilter extends OncePerRequestFilter {
                 String expected = "Bearer " + expectedSecret;
 
                 if (!constantTimeEquals(authorization, expected)) {
-                        logger.info("Authentik webhook authentication failed");
+                        logging.info("Authentik webhook authentication failed");
 
                         if (debugEnabled) {
-                                logger.info("Authorization header present: {}", authorization != null);
+                                logging.info("Authorization header present: {}", authorization != null);
                         }
                         response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
                         return;
                 }
 
-                if (debugEnabled) logger.info("Authentik webhook authentication succeeded");
+                if (debugEnabled)
+                        logging.info("Authentik webhook authentication succeeded");
 
                 filterChain.doFilter(request, response);
         }
@@ -87,24 +88,26 @@ public class AuthentikWebhookFilter extends OncePerRequestFilter {
         }
 
         private boolean isAllowedSource(String remoteAddress) {
-                if (remoteAddress == null || remoteAddress.isBlank()) return false;
+                if (remoteAddress == null || remoteAddress.isBlank())
+                        return false;
 
                 try {
                         InetAddress address = InetAddress.getByName(remoteAddress);
 
                         return allowedSourceCidrs.stream()
-                                .map(String::trim)
-                                .filter(cidr -> !cidr.isBlank())
-                                .anyMatch(cidr -> isAddressInCidr(address, cidr));
+                                        .map(String::trim)
+                                        .filter(cidr -> !cidr.isBlank())
+                                        .anyMatch(cidr -> isAddressInCidr(address, cidr));
                 } catch (UnknownHostException exception) {
-                        logger.info("Could not parse Authentik webhook source address: {}", remoteAddress);
+                        logging.info("Could not parse Authentik webhook source address: {}", remoteAddress);
                         return false;
                 }
         }
 
         private boolean isAddressInCidr(InetAddress address, String cidr) {
                 String[] parts = cidr.split("/");
-                if (parts.length != 2) return false;
+                if (parts.length != 2)
+                        return false;
 
                 try {
                         InetAddress networkAddress = InetAddress.getByName(parts[0]);
@@ -113,31 +116,34 @@ public class AuthentikWebhookFilter extends OncePerRequestFilter {
                         byte[] addressBytes = address.getAddress();
                         byte[] networkBytes = networkAddress.getAddress();
 
-                        if (addressBytes.length != networkBytes.length) return false;
+                        if (addressBytes.length != networkBytes.length)
+                                return false;
 
                         int fullBytes = prefixLength / 8;
                         int remainingBits = prefixLength % 8;
 
                         for (int index = 0; index < fullBytes; index++) {
-                                if (addressBytes[index] != networkBytes[index]) return false;
+                                if (addressBytes[index] != networkBytes[index])
+                                        return false;
                         }
 
-                        if (remainingBits == 0) return true;
+                        if (remainingBits == 0)
+                                return true;
 
                         int mask = (-1 << (8 - remainingBits)) & 0xff;
                         return (addressBytes[fullBytes] & mask) == (networkBytes[fullBytes] & mask);
                 } catch (UnknownHostException | NumberFormatException exception) {
-                        logger.info("Could not parse allowed Authentik webhook CIDR: {}", cidr);
+                        logging.info("Could not parse allowed Authentik webhook CIDR: {}", cidr);
                         return false;
                 }
         }
 
         private boolean constantTimeEquals(String actual, String expected) {
-                if (actual == null) return false;
+                if (actual == null)
+                        return false;
 
                 return MessageDigest.isEqual(
-                        actual.getBytes(StandardCharsets.UTF_8),
-                        expected.getBytes(StandardCharsets.UTF_8)
-                );
+                                actual.getBytes(StandardCharsets.UTF_8),
+                                expected.getBytes(StandardCharsets.UTF_8));
         }
 }
