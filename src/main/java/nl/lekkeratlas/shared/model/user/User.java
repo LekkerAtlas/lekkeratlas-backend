@@ -1,15 +1,15 @@
 package nl.lekkeratlas.shared.model.user;
 
+import java.io.IOException;
+import java.time.Instant;
+import java.util.UUID;
+
 import io.github.david.auk.fluid.jdbc.annotations.table.TableName;
 import io.github.david.auk.fluid.jdbc.annotations.table.constructor.TableConstructor;
 import io.github.david.auk.fluid.jdbc.annotations.table.field.PrimaryKey;
 import io.github.david.auk.fluid.jdbc.annotations.table.field.TableColumn;
 import io.github.david.auk.fluid.jdbc.components.tables.TableEntity;
 import nl.lekkeratlas.backendapi.web.authentik.dto.AuthentikUser;
-
-import java.io.IOException;
-import java.time.Instant;
-import java.util.UUID;
 
 @TableName("app_user")
 public class User implements TableEntity {
@@ -39,8 +39,10 @@ public class User implements TableEntity {
         @TableColumn(columnName = "last_login")
         private final Instant lastLogin;
 
+        @SuppressWarnings("java:S107")
         @TableConstructor
-        public User(UUID id, String username, String displayName, String email, Boolean isVerified, Instant dateJoined, Instant lastUpdated, Instant lastLogin) {
+        public User(UUID id, String username, String displayName, String email, Boolean isVerified, Instant dateJoined,
+                        Instant lastUpdated, Instant lastLogin) {
                 this.id = id;
                 this.username = username;
                 this.displayName = displayName;
@@ -53,15 +55,14 @@ public class User implements TableEntity {
 
         public User(AuthentikUser authentikUser) throws IOException {
                 this(
-                        authentikUser.formatUuid(),
-                        authentikUser.username(),
-                        authentikUser.name(),
-                        authentikUser.email(),
-                        false,
-                        authentikUser.date_joined(),
-                        authentikUser.last_updated(),
-                        authentikUser.last_login()
-                );
+                                authentikUser.formatUuid(),
+                                authentikUser.username(),
+                                authentikUser.name(),
+                                authentikUser.email(),
+                                false,
+                                authentikUser.date_joined(),
+                                authentikUser.last_updated(),
+                                authentikUser.last_login());
         }
 
         public UUID getId() {
@@ -97,17 +98,19 @@ public class User implements TableEntity {
         }
 
         /**
-         * This class is used to create a User object with a UUID but without any other fields filled in.
-         * This is used to PUT a user into the database without having to fill in all the fields.
+         * This class is used to create a User object with a UUID but without any other
+         * fields filled in.
+         * This is used to PUT a user into the database without having to fill in all
+         * the fields.
          */
         public static User getDummyUser(UUID id) {
                 return new User(id,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null);
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null);
         }
 }

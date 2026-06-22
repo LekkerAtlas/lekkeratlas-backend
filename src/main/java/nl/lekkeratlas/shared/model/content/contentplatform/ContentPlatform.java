@@ -1,5 +1,9 @@
 package nl.lekkeratlas.shared.model.content.contentplatform;
 
+import java.time.Instant;
+import java.util.Objects;
+import java.util.UUID;
+
 import io.github.david.auk.fluid.jdbc.annotations.table.TableName;
 import io.github.david.auk.fluid.jdbc.annotations.table.constructor.TableConstructor;
 import io.github.david.auk.fluid.jdbc.annotations.table.field.ForeignKey;
@@ -7,10 +11,6 @@ import io.github.david.auk.fluid.jdbc.annotations.table.field.PrimaryKey;
 import io.github.david.auk.fluid.jdbc.annotations.table.field.TableColumn;
 import io.github.david.auk.fluid.jdbc.components.tables.TableEntity;
 import nl.lekkeratlas.shared.model.user.User;
-
-import java.time.Instant;
-import java.util.Objects;
-import java.util.UUID;
 
 @TableName("content_platform")
 public class ContentPlatform implements TableEntity {
@@ -36,7 +36,8 @@ public class ContentPlatform implements TableEntity {
         private final Instant createdAt;
 
         @TableConstructor
-        public ContentPlatform(UUID id, ContentPlatformKind platformKind, String displayName, Boolean fetchNewContentIsAutomated, User addedBy, Instant createdAt) {
+        public ContentPlatform(UUID id, ContentPlatformKind platformKind, String displayName,
+                        Boolean fetchNewContentIsAutomated, User addedBy, Instant createdAt) {
                 this.id = Objects.requireNonNullElseGet(id, UUID::randomUUID);
                 this.platformKind = platformKind;
                 this.displayName = displayName;
@@ -47,13 +48,12 @@ public class ContentPlatform implements TableEntity {
 
         public ContentPlatform(ContentPlatform contentPlatform) {
                 this(
-                        contentPlatform.getId(),
-                        contentPlatform.getPlatformKind(),
-                        contentPlatform.getDisplayName(),
-                        contentPlatform.getFetchNewContentIsAutomated(),
-                        contentPlatform.getAddedBy(),
-                        contentPlatform.getCreatedAt()
-                );
+                                contentPlatform.getId(),
+                                contentPlatform.getPlatformKind(),
+                                contentPlatform.getDisplayName(),
+                                contentPlatform.getFetchNewContentIsAutomated(),
+                                contentPlatform.getAddedBy(),
+                                contentPlatform.getCreatedAt());
         }
 
         public UUID getId() {
@@ -82,12 +82,11 @@ public class ContentPlatform implements TableEntity {
 
         public static ContentPlatform getDummyContentPlatform(UUID id) {
                 return new ContentPlatform(
-                        id,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null
-                );
+                                id,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null);
         }
 }

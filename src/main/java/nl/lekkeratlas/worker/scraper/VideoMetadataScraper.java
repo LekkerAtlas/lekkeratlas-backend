@@ -1,10 +1,11 @@
 package nl.lekkeratlas.worker.scraper;
 
-import com.github.davidauk.youtubescraper.client.YoutubeClient;
-import com.github.davidauk.youtubescraper.model.content.Video;
+import java.io.IOException;
+
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
+import com.github.davidauk.youtubescraper.client.YoutubeClient;
+import com.github.davidauk.youtubescraper.model.content.Video;
 
 /**
  * Temporary placeholder scraper.
@@ -21,8 +22,6 @@ public class VideoMetadataScraper {
         }
 
         public Video scrape(String videoId) throws IOException, InterruptedException {
-                YoutubeClient newYoutubeClient = new YoutubeClient();
-
-                return newYoutubeClient.getVideo(videoId);
+                return client.getVideo(videoId);
         }
 }

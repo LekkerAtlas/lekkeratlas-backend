@@ -10,6 +10,6 @@ public class FailedQueueJobException extends QueueJobException {
 
         public FailedQueueJobException(QueueJob queueJob, Exception exception) {
                 super(queueJob, exception.getMessage(), "There was an internal server error, " +
-                        "please send this to an administrator: " + exception.getMessage());
+                                "please send this to an administrator: " + exception.getMessage());
         }
 }

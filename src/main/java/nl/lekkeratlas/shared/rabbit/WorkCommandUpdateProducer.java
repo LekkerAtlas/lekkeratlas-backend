@@ -18,21 +18,20 @@ import java.util.UUID;
 public class WorkCommandUpdateProducer {
 
         public QueueJobEvent update(
-                Connection connection,
-                QueueJob queueJob,
-                QueueJobStatus status,
-                String messageForEndUser
-        ) {
-                try (Dao<QueueJobEvent, UUID> queueJobEventDao = DAOFactory.createDAO(connection, QueueJobEvent.class)) {
+                        Connection connection,
+                        QueueJob queueJob,
+                        QueueJobStatus status,
+                        String messageForEndUser) {
+                try (Dao<QueueJobEvent, UUID> queueJobEventDao = DAOFactory.createDAO(connection,
+                                QueueJobEvent.class)) {
                         return update(queueJobEventDao, queueJob, status, messageForEndUser);
                 }
         }
 
         public QueueJobEvent update(
-                QueueJob queueJob,
-                QueueJobStatus status,
-                String messageForEndUser
-        ) {
+                        QueueJob queueJob,
+                        QueueJobStatus status,
+                        String messageForEndUser) {
                 try (Connection connection = Database.getConnection()) {
                         return update(connection, queueJob, status, messageForEndUser);
                 } catch (SQLException e) {
@@ -41,20 +40,18 @@ public class WorkCommandUpdateProducer {
         }
 
         public QueueJobEvent update(
-                Dao<QueueJobEvent, UUID> queueJobEventDao,
-                QueueJob queueJob,
-                QueueJobStatus status,
-                String messageForEndUser
-        ) {
+                        Dao<QueueJobEvent, UUID> queueJobEventDao,
+                        QueueJob queueJob,
+                        QueueJobStatus status,
+                        String messageForEndUser) {
                 UUID commandId = UUID.randomUUID();
 
                 QueueJobEvent queueJobEvent = new QueueJobEvent(
-                        commandId,
-                        queueJob,
-                        status,
-                        messageForEndUser,
-                        Instant.now()
-                );
+                                commandId,
+                                queueJob,
+                                status,
+                                messageForEndUser,
+                                Instant.now());
 
                 try {
                         queueJobEventDao.add(queueJobEvent);

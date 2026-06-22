@@ -1,33 +1,45 @@
 package nl.lekkeratlas.backendapi.web.progress;
 
+import static io.github.david.auk.fluid.jdbc.components.daos.querying.operator.SingleValueOperator.EQUALS;
+
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import io.github.david.auk.fluid.jdbc.components.Database;
 import io.github.david.auk.fluid.jdbc.components.daos.Dao;
 import io.github.david.auk.fluid.jdbc.components.daos.QueryBuilder;
 import io.github.david.auk.fluid.jdbc.factories.DAOFactory;
+import nl.lekkeratlas.backendapi.exceptions.JWTException;
+import nl.lekkeratlas.backendapi.exceptions.QueueException;
+import nl.lekkeratlas.backendapi.exceptions.QueueJobException;
 import nl.lekkeratlas.backendapi.web.Utils;
 import nl.lekkeratlas.backendapi.web.dto.GetProgressResponse;
 import nl.lekkeratlas.backendapi.web.dto.Progress;
 import nl.lekkeratlas.backendapi.web.dto.ProgressStatusEvent;
+import nl.lekkeratlas.shared.exceptions.UserNotFoundException;
 import nl.lekkeratlas.shared.model.queue.QueueJob;
 import nl.lekkeratlas.shared.model.queue.QueueJobEvent;
 import nl.lekkeratlas.shared.model.user.User;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import org.springframework.web.bind.annotation.*;
-
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.List;
-import java.util.UUID;
-
-import static io.github.david.auk.fluid.jdbc.components.daos.querying.operator.SingleValueOperator.EQUALS;
 
 @RestController
 @RequestMapping("/api/progress")
 public class ProgressController {
 
         @GetMapping("/{queueJobId}")
-        public ResponseEntity<GetProgressResponse> getProgress(@PathVariable UUID queueJobId, JwtAuthenticationToken authenticationToken) throws SQLException, NoSuchFieldException {
+        public ResponseEntity<GetProgressResponse> getProgress(@PathVariable UUID queueJobId,
+                        JwtAuthenticationToken authenticationToken)
+                        throws SQLException, NoSuchFieldException, JWTException,
+                        UserNotFoundException, QueueException {
 
                 validateQueueJobId(queueJobId);
 
@@ -38,73 +50,74 @@ public class ProgressController {
                         QueueJob queueJob = getQueueJobForUser(connection, queueJobId, user, userId);
 
                         return ResponseEntity.ok(new GetProgressResponse(
-                                buildProgress(connection, queueJob)
-                        ));
+                                        buildProgress(connection, queueJob)));
                 }
         }
 
-        private void validateQueueJobId(UUID queueJobId) {
+        private void validateQueueJobId(UUID queueJobId) throws QueueJobException {
                 if (queueJobId == null) {
-                        throw new RuntimeException("Queue job id is required");
+                        throw new QueueJobException("Queue job id is required");
                 }
         }
 
-        private User getCurrentUser(Connection connection, UUID userId) throws SQLException {
+        private User getCurrentUser(Connection connection, UUID userId) throws UserNotFoundException {
                 try (Dao<User, UUID> userDao = DAOFactory.createDAO(connection, User.class)) {
                         User user = userDao.get(userId);
 
                         if (user == null) {
-                                throw new RuntimeException("User not found");
+                                throw new UserNotFoundException("User not found");
                         }
 
                         return user;
                 }
         }
 
-        private QueueJob getQueueJobForUser(Connection connection, UUID queueJobId, User user, UUID userId) throws SQLException, NoSuchFieldException {
+        private QueueJob getQueueJobForUser(Connection connection, UUID queueJobId, User user, UUID userId)
+                        throws NoSuchFieldException, QueueException {
                 try (Dao<QueueJob, UUID> queueJobDao = DAOFactory.createDAO(connection, QueueJob.class)) {
                         QueueJob queueJob = new QueryBuilder<>(queueJobDao)
-                                .where(QueueJob.class.getDeclaredField("id"), EQUALS, queueJobId)
-                                .and(QueueJob.class.getDeclaredField("requestedBy"), EQUALS, user.getId())
-                                .getUnique();
+                                        .where(QueueJob.class.getDeclaredField("id"), EQUALS, queueJobId)
+                                        .and(QueueJob.class.getDeclaredField("requestedBy"), EQUALS, user.getId())
+                                        .getUnique();
 
                         if (queueJob == null) {
-                                throw new RuntimeException("Queue job " + queueJobId +
-                                        " not found for user " + userId);
+                                throw new QueueException("Queue job " + queueJobId +
+                                                " not found for user " + userId);
                         }
 
                         return queueJob;
                 }
         }
 
-        private Progress buildProgress(Connection connection, QueueJob queueJob) throws SQLException, NoSuchFieldException {
+        private Progress buildProgress(Connection connection, QueueJob queueJob)
+                        throws SQLException, NoSuchFieldException {
+
                 List<QueueJobEvent> events = getQueueJobEvents(connection, queueJob);
-                List<Progress> childProgresses = getChildQueueJobs(connection, queueJob)
-                        .stream()
-                        .map(childQueueJob -> {
-                                try {
-                                        return buildProgress(connection, childQueueJob);
-                                } catch (SQLException | NoSuchFieldException exception) {
-                                        throw new RuntimeException(exception);
-                                }
-                        })
-                        .toList();
+
+                List<Progress> childProgresses = new ArrayList<>();
+
+                for (QueueJob childQueueJob : getChildQueueJobs(connection, queueJob)) {
+                        childProgresses.add(buildProgress(connection, childQueueJob));
+                }
 
                 return new Progress(
-                        queueJob.getId(),
-                        queueJob.getStatus(),
-                        ProgressStatusEvent.from(events),
-                        childProgresses
-                );
+                                queueJob.getId(),
+                                queueJob.getStatus(),
+                                ProgressStatusEvent.from(events),
+                                childProgresses);
         }
 
-        private List<QueueJobEvent> getQueueJobEvents(Connection connection, QueueJob queueJob) throws SQLException, NoSuchFieldException {
-                try (Dao<QueueJobEvent, UUID> queueJobEventDao = DAOFactory.createDAO(connection, QueueJobEvent.class)) {
-                        return queueJobEventDao.get(QueueJobEvent.class.getDeclaredField("job"), EQUALS, queueJob.getId());
+        private List<QueueJobEvent> getQueueJobEvents(Connection connection, QueueJob queueJob)
+                        throws NoSuchFieldException {
+                try (Dao<QueueJobEvent, UUID> queueJobEventDao = DAOFactory.createDAO(connection,
+                                QueueJobEvent.class)) {
+                        return queueJobEventDao.get(QueueJobEvent.class.getDeclaredField("job"), EQUALS,
+                                        queueJob.getId());
                 }
         }
 
-        private List<QueueJob> getChildQueueJobs(Connection connection, QueueJob queueJob) throws SQLException, NoSuchFieldException {
+        private List<QueueJob> getChildQueueJobs(Connection connection, QueueJob queueJob)
+                        throws NoSuchFieldException {
                 try (Dao<QueueJob, UUID> queueJobDao = DAOFactory.createDAO(connection, QueueJob.class)) {
                         return queueJobDao.get(QueueJob.class.getDeclaredField("parentJob"), EQUALS, queueJob.getId());
                 }

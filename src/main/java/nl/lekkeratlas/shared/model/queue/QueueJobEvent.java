@@ -13,49 +13,49 @@ import java.util.UUID;
 @TableName("queue_job_event")
 public class QueueJobEvent implements TableEntity {
 
-    @PrimaryKey
-    @TableColumn
-    private final UUID id;
+        @PrimaryKey
+        @TableColumn
+        private final UUID id;
 
-    @ForeignKey
-    @TableColumn(columnName = "job_id")
-    private final QueueJob job;
+        @ForeignKey
+        @TableColumn(columnName = "job_id")
+        private final QueueJob job;
 
-    @TableColumn
-    private final QueueJobStatus status;
+        @TableColumn
+        private final QueueJobStatus status;
 
-    @TableColumn
-    private final String message;
+        @TableColumn
+        private final String message;
 
-    @TableColumn(columnName = "created_at")
-    private final Instant createdAt;
+        @TableColumn(columnName = "created_at")
+        private final Instant createdAt;
 
-    @TableConstructor
-    public QueueJobEvent(UUID id, QueueJob job, QueueJobStatus status, String message, Instant createdAt) {
-        this.id = id;
-        this.job = job;
-        this.status = status;
-        this.message = message;
-        this.createdAt = createdAt;
-    }
+        @TableConstructor
+        public QueueJobEvent(UUID id, QueueJob job, QueueJobStatus status, String message, Instant createdAt) {
+                this.id = id;
+                this.job = job;
+                this.status = status;
+                this.message = message;
+                this.createdAt = createdAt;
+        }
 
-    public UUID getId() {
-        return id;
-    }
+        public UUID getId() {
+                return id;
+        }
 
-    public QueueJob getJob() {
-        return job;
-    }
+        public QueueJob getJob() {
+                return job;
+        }
 
-    public QueueJobStatus getStatus() {
-        return status;
-    }
+        public QueueJobStatus getStatus() {
+                return status;
+        }
 
-    public String getMessage() {
-        return message;
-    }
+        public String getMessage() {
+                return message;
+        }
 
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
+        public Instant getCreatedAt() {
+                return createdAt;
+        }
 }
