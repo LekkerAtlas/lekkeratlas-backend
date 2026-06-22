@@ -1,6 +1,5 @@
 package nl.lekkeratlas.backendapi;
 
-import java.io.Serializable;
 import java.sql.SQLException;
 import java.util.Map;
 
@@ -11,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
+import nl.lekkeratlas.backendapi.exceptions.NewException;
 import nl.lekkeratlas.shared.exceptions.HttpResponsableException;
 
 @ControllerAdvice
