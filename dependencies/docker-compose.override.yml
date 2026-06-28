@@ -1,0 +1,6 @@
+services:
+  authentik-server:
+    platform: linux/amd64
+
+  authentik-worker:
+    platform: linux/amd64

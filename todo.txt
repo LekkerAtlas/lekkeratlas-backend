@@ -1,0 +1,2 @@
+x 2026-06-28 2026-06-28 Add working justfile to improve DX +developer_expirience
+x 2026-06-25 2026-06-25 test
