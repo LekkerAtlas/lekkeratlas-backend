@@ -1,0 +1,120 @@
+services:
+  database:
+    image: ghcr.io/lekkeratlas/lekkeratlas-database:latest
+    container_name: lekkeratlas-database
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    volumes:
+      - database-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432" # Optional local-only debug binding for PostgreSQL
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "${RABBITMQ_PORT}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test:
+        - CMD
+        - rabbitmq-diagnostics
+        - -q
+        - ping
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  authentik-postgresql:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${AUTHENTIK_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${AUTHENTIK_POSTGRES_DB}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - authentik-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  authentik-server:
+    image: ghcr.io/lekkeratlas/lekkeratlas-authentik:experimental
+    restart: unless-stopped
+    command: server
+    environment:
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: ${AUTHENTIK_ERROR_REPORTING__ENABLED}
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgresql
+      AUTHENTIK_POSTGRESQL__NAME: ${AUTHENTIK_POSTGRES_DB}
+      AUTHENTIK_POSTGRESQL__USER: ${AUTHENTIK_POSTGRES_USER}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD}
+      AUTHENTIK_BOOTSTRAP_EMAIL: ${AUTHENTIK_BOOTSTRAP_EMAIL}
+      AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD}
+      AUTHENTIK_BOOTSTRAP_TOKEN: ${AUTHENTIK_BOOTSTRAP_TOKEN}
+    ports:
+      - "${AUTHENTIK_HTTP_PORT}:9000"
+      - "${AUTHENTIK_HTTPS_PORT}:9443"
+    depends_on:
+      authentik-postgresql:
+        condition: service_healthy
+    volumes:
+      - authentik-data:/data
+
+  authentik-worker:
+    image: ghcr.io/lekkeratlas/lekkeratlas-authentik:experimental
+    restart: unless-stopped
+    command: worker
+    environment:
+      LEKKERATLAS_HEALTH_REQUIRE_BLUEPRINTS: "true"
+      LEKKERATLAS_STATE_DIR: /tmp/lekkeratlas
+
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: ${AUTHENTIK_ERROR_REPORTING__ENABLED}
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgresql
+      AUTHENTIK_POSTGRESQL__NAME: ${AUTHENTIK_POSTGRES_DB}
+      AUTHENTIK_POSTGRESQL__USER: ${AUTHENTIK_POSTGRES_USER}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD}
+
+      AUTHENTIK_LEKKERATLAS_FQDN: ${AUTHENTIK_LEKKERATLAS_FQDN}
+      AUTHENTIK_LEKKERATLAS_REDIRECT_URI: ${AUTHENTIK_LEKKERATLAS_REDIRECT_URI}
+      AUTHENTIK_LEKKERATLAS_LOGOUT_URI: ${AUTHENTIK_LEKKERATLAS_REDIRECT_URI}
+      AUTHENTIK_LEKKERATLAS_WEBHOOK_FQDN: ${AUTHENTIK_LEKKERATLAS_WEBHOOK_FQDN}
+
+      AUTHENTIK_WEBHOOK_SYNC_LEKKERATLAS_DB_BEARER_TOKEN: ${AUTHENTIK_WEBHOOK_SYNC_LEKKERATLAS_DB_BEARER_TOKEN}
+      AUTHENTIK_PROVIDER_FOR_LEKKERATLAS_CLIENT_SECRET: ${AUTHENTIK_PROVIDER_FOR_LEKKERATLAS_CLIENT_SECRET}
+      AUTHENTIK_RABBITMQ_CLIENT_SECRET: ${AUTHENTIK_RABBITMQ_CLIENT_SECRET}
+    depends_on:
+      authentik-postgresql:
+        condition: service_healthy
+      authentik-server:
+        condition: service_started
+    volumes:
+      - authentik-data:/data
+
+volumes:
+  database-data:
+  rabbitmq-data:
+  authentik-postgres-data:
+  authentik-data:
