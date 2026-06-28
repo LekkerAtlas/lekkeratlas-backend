@@ -1,6 +1,16 @@
 package nl.lekkeratlas.worker.handler;
 
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.time.Instant;
+import java.util.UUID;
+
+import org.springframework.amqp.AmqpRejectAndDontRequeueException;
+import org.springframework.stereotype.Component;
+
 import com.github.davidauk.youtubescraper.model.content.Video;
+
 import io.github.david.auk.fluid.jdbc.components.Database;
 import io.github.david.auk.fluid.jdbc.components.daos.Dao;
 import io.github.david.auk.fluid.jdbc.factories.DAOFactory;
@@ -19,16 +29,6 @@ import nl.lekkeratlas.worker.exceptions.QueueJobException;
 import nl.lekkeratlas.worker.scraper.VideoMetadataScraper;
 import nl.lekkeratlas.worker.service.QueueJobLookupService;
 import nl.lekkeratlas.worker.service.UserLookupService;
-import org.springframework.amqp.AmqpRejectAndDontRequeueException;
-import org.springframework.stereotype.Component;
-
-import java.io.IOException;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.time.Instant;
-import java.util.UUID;
-
-import static nl.lekkeratlas.shared.model.queue.QueueJobStatus.COMPLETED;
 
 /**
  * Handles video imports.
@@ -53,53 +53,55 @@ public class FetchVideoMetadataCommandHandler {
                 this.queueJobLookupService = queueJobLookupService;
         }
 
-        // TODO Migrate to sub methods
+        /**
+         * TODO fill
+         * 
+         * @param envelope
+         * @param command
+         * @throws QueueJobException
+         */
         public void handle(
                         WorkCommandEnvelope envelope,
                         FetchVideoMetadataCommand command) throws QueueJobException {
-                QueueJob scrapeVideoQueueJob;
-                String videoId = command.videoId();
+                QueueJob scrapeVideoQueueJob = validateAndLoadScrapeVideoQueueJob(envelope, command);
+                Video videoMetadata = scrapeVideoMetadata(scrapeVideoQueueJob, command.videoId());
 
+                saveVideoMetadata(command, scrapeVideoQueueJob, videoMetadata);
+        }
+
+        /**
+         * @param envelope The incomming queued request
+         * @param command  The command that
+         * @return A validated QueueJob object that is from the same user
+         *         that made the request
+         */
+        private QueueJob validateAndLoadScrapeVideoQueueJob(
+                        WorkCommandEnvelope envelope,
+                        FetchVideoMetadataCommand command) {
                 try (Connection connection = Database.getConnection()) {
-
-                        // Enforce that the necessary values are present
                         userLookupService.requireExistingUser(connection, command.requestedByUserId());
-                        scrapeVideoQueueJob = queueJobLookupService.requireQueueJob(connection, envelope.commandId());
 
+                        return queueJobLookupService.requireQueueJob(connection, envelope.commandId());
                 } catch (SQLException e) {
                         throw new AmqpRejectAndDontRequeueException(e);
                 }
+        }
 
-                Video videoMetadata;
-                String title;
-                String description;
-                Instant publishedAt;
-
+        private Video scrapeVideoMetadata(
+                        QueueJob scrapeVideoQueueJob,
+                        String videoId) throws QueueJobException {
                 try {
                         workCommandUpdateProducer.update(
                                         scrapeVideoQueueJob,
                                         QueueJobStatus.RUNNING,
-                                        "Beginning scraping video " + command.videoId());
-                        videoMetadata = videoMetadataScraper.scrape(videoId);
+                                        "Beginning scraping video " + videoId);
 
-                        if (videoMetadata == null) {
-                                throw new FailedQueueJobException(
-                                                scrapeVideoQueueJob,
-                                                "videoMetadata has null value",
-                                                "Channel not found: " + videoId);
-                        }
+                        Video videoMetadata = videoMetadataScraper.scrape(videoId);
 
-                        title = videoMetadata.getTitle();
-                        description = videoMetadata.getDescription();
-                        publishedAt = videoMetadata.getPublishedAt();
+                        requireValidVideoMetadata(scrapeVideoQueueJob, videoId,
+                                        videoMetadata);
 
-                        if (title == null || title.isEmpty() || publishedAt == null) {
-                                throw new FailedQueueJobException(
-                                                scrapeVideoQueueJob,
-                                                "Scraped video data is missing a required value",
-                                                "Missing essential data from the scraped video data");
-                        }
-
+                        return videoMetadata;
                 } catch (IOException e) {
                         throw new FailedQueueJobException(scrapeVideoQueueJob, e);
                 } catch (InterruptedException e) {
@@ -110,53 +112,106 @@ public class FetchVideoMetadataCommandHandler {
                                         "User interrupted scraping video",
                                         "Video scraping was interrupted for " + videoId);
                 }
+        }
 
+        private void requireValidVideoMetadata(
+                        QueueJob scrapeVideoQueueJob,
+                        String videoId,
+                        Video videoMetadata) throws FailedQueueJobException {
+                if (videoMetadata == null) {
+                        throw new FailedQueueJobException(
+                                        scrapeVideoQueueJob,
+                                        "videoMetadata has null value",
+                                        "Video not found: " + videoId);
+                }
+
+                if (videoMetadata.getTitle() == null
+                                || videoMetadata.getTitle().isEmpty()
+                                || videoMetadata.getPublishedAt() == null) {
+                        throw new FailedQueueJobException(
+                                        scrapeVideoQueueJob,
+                                        "Scraped video data is missing a required value",
+                                        "Missing essential data from the scraped video data");
+                }
+        }
+
+        private void saveVideoMetadata(
+                        FetchVideoMetadataCommand command,
+                        QueueJob scrapeVideoQueueJob,
+                        Video videoMetadata) throws QueueJobException {
                 try (Connection connection = Database.getConnection()) {
+                        requireExistingContentPlatform(connection, command, scrapeVideoQueueJob);
 
-                        try (Dao<ContentPlatform, UUID> contentPlatformDao = DAOFactory.createDAO(connection,
-                                        ContentPlatform.class)) {
-                                if (!contentPlatformDao.existsByPrimaryKey(command.contentPlatformId())) {
-                                        throw new FailedQueueJobException(
-                                                        scrapeVideoQueueJob,
-                                                        "ContentPlatform ID has null value for video " + videoId,
-                                                        "Could not find related channel, please inform the administrator");
-                                }
-                        }
-
-                        try (
-                                        Dao<Content, UUID> contentDao = DAOFactory.createDAO(connection, Content.class);
-                                        Dao<HostedContent, UUID> hostedContentDao = DAOFactory.createDAO(connection,
-                                                        HostedContent.class)) {
-                                Content content = new Content(
-                                                UUID.randomUUID(),
-                                                ContentType.OTHER,
-                                                title,
-                                                description,
-                                                true,
-                                                publishedAt,
-                                                Instant.now(),
-                                                Instant.now());
-
-                                contentDao.add(content);
-
-                                HostedContent hostedContent = new HostedContent(
-                                                UUID.randomUUID(),
-                                                content,
-
-                                                // Insert an empty content platform, the ID is validated
-                                                ContentPlatform.getDummyContentPlatform(command.contentPlatformId()),
-                                                videoMetadata.getId());
-
-                                hostedContentDao.add(hostedContent);
-                        }
+                        saveContentAndHostedContent(connection, command, videoMetadata);
 
                         workCommandUpdateProducer.update(
                                         connection,
                                         scrapeVideoQueueJob,
-                                        COMPLETED,
+                                        QueueJobStatus.COMPLETED,
                                         "Saved video metadata for " + videoMetadata.getTitle());
                 } catch (SQLException e) {
                         throw new AmqpRejectAndDontRequeueException(e);
                 }
+        }
+
+        private void requireExistingContentPlatform(
+                        Connection connection,
+                        FetchVideoMetadataCommand command,
+                        QueueJob scrapeVideoQueueJob) throws FailedQueueJobException {
+                try (Dao<ContentPlatform, UUID> contentPlatformDao = DAOFactory.createDAO(
+                                connection,
+                                ContentPlatform.class)) {
+                        if (!contentPlatformDao.existsByPrimaryKey(command.contentPlatformId())) {
+                                throw new FailedQueueJobException(
+                                                scrapeVideoQueueJob,
+                                                "ContentPlatform ID has null value for video " + command.videoId(),
+                                                "Could not find related content platform, please inform the administrator");
+                        }
+                }
+        }
+
+        private void saveContentAndHostedContent(
+                        Connection connection,
+                        FetchVideoMetadataCommand command,
+                        Video videoMetadata) {
+                try (
+                                Dao<Content, UUID> contentDao = DAOFactory.createDAO(connection, Content.class);
+                                Dao<HostedContent, UUID> hostedContentDao = DAOFactory.createDAO(connection,
+                                                HostedContent.class)) {
+                        Content content = createContent(videoMetadata);
+
+                        contentDao.add(content);
+
+                        HostedContent hostedContent = createHostedContent(command, videoMetadata, content);
+
+                        hostedContentDao.add(hostedContent);
+                }
+        }
+
+        private Content createContent(Video videoMetadata) {
+                Instant now = Instant.now();
+
+                return new Content(
+                                UUID.randomUUID(),
+                                ContentType.OTHER,
+                                videoMetadata.getTitle(),
+                                videoMetadata.getDescription(),
+                                true,
+                                videoMetadata.getPublishedAt(),
+                                now,
+                                now);
+        }
+
+        private HostedContent createHostedContent(
+                        FetchVideoMetadataCommand command,
+                        Video videoMetadata,
+                        Content content) {
+                return new HostedContent(
+                                UUID.randomUUID(),
+                                content,
+
+                                // Insert an empty content platform, the ID is validated before saving
+                                ContentPlatform.getDummyContentPlatform(command.contentPlatformId()),
+                                videoMetadata.getId());
         }
 }
