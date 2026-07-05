@@ -4,9 +4,9 @@ import org.springframework.http.HttpStatus;
 
 import nl.lekkeratlas.shared.exceptions.HttpResponsableException;
 
-public class JWTException extends HttpResponsableException {
+public class JsonWebTokenException extends HttpResponsableException {
 
-        public JWTException(HttpStatus status, String message) {
+        public JsonWebTokenException(HttpStatus status, String message) {
                 super(status, message);
         }
 }

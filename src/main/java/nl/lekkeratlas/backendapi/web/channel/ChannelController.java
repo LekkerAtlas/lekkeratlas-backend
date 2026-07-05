@@ -18,7 +18,7 @@ import io.github.david.auk.fluid.jdbc.components.daos.Dao;
 import io.github.david.auk.fluid.jdbc.components.daos.QueryBuilder;
 import io.github.david.auk.fluid.jdbc.components.daos.querying.operator.SingleValueOperator;
 import io.github.david.auk.fluid.jdbc.factories.DAOFactory;
-import nl.lekkeratlas.backendapi.exceptions.JWTException;
+import nl.lekkeratlas.backendapi.exceptions.JsonWebTokenException;
 import nl.lekkeratlas.backendapi.web.Utils;
 import nl.lekkeratlas.backendapi.web.dto.AddChannelRequest;
 import nl.lekkeratlas.backendapi.web.dto.CommandAcceptedResponse;
@@ -43,7 +43,8 @@ public class ChannelController {
         public ResponseEntity<CommandAcceptedResponse> addChannel(
                         @RequestBody AddChannelRequest request,
                         JwtAuthenticationToken authentication)
-                        throws NoSuchFieldException, JWTException, UsernameNotFoundException, UserNotFoundException,
+                        throws NoSuchFieldException, JsonWebTokenException, UsernameNotFoundException,
+                        UserNotFoundException,
                         SQLException {
                 UUID userId = Utils.resolveCurrentUserId(authentication);
 
