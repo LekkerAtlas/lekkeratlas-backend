@@ -134,4 +134,8 @@ public class QueueJob implements TableEntity, Serializable {
         public Instant getFinishedAt() {
                 return finishedAt;
         }
+
+        public boolean isCanceled() {
+                return getStatus() == QueueJobStatus.CANCELED || getParentJob().isCanceled();
+        }
 }

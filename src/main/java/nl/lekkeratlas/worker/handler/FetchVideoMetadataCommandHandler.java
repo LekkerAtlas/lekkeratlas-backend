@@ -64,6 +64,11 @@ public class FetchVideoMetadataCommandHandler {
                         WorkCommandEnvelope envelope,
                         FetchVideoMetadataCommand command) throws QueueJobException {
                 QueueJob scrapeVideoQueueJob = validateAndLoadScrapeVideoQueueJob(envelope, command);
+
+                if (scrapeVideoQueueJob.isCanceled())
+                        throw new CanceledQueueJobException(scrapeVideoQueueJob, "job marked as canceled",
+                                        "Canceled Job");
+
                 Video videoMetadata = scrapeVideoMetadata(scrapeVideoQueueJob, command.videoId());
 
                 saveVideoMetadata(command, scrapeVideoQueueJob, videoMetadata);
