@@ -16,7 +16,7 @@ import io.github.david.auk.fluid.jdbc.components.Database;
 import io.github.david.auk.fluid.jdbc.components.daos.Dao;
 import io.github.david.auk.fluid.jdbc.components.daos.QueryBuilder;
 import io.github.david.auk.fluid.jdbc.factories.DAOFactory;
-import nl.lekkeratlas.backendapi.exceptions.JWTException;
+import nl.lekkeratlas.backendapi.exceptions.JsonWebTokenException;
 import nl.lekkeratlas.backendapi.exceptions.QueueJobException;
 import nl.lekkeratlas.backendapi.web.Utils;
 import nl.lekkeratlas.shared.exceptions.UserNotFoundException;
@@ -29,7 +29,7 @@ public class CommandController {
 
         @DeleteMapping("/{commandId}")
         public void deleteCommand(@PathVariable String commandId, JwtAuthenticationToken authenticationToken)
-                        throws SQLException, NoSuchFieldException, JWTException, UserNotFoundException,
+                        throws SQLException, NoSuchFieldException, JsonWebTokenException, UserNotFoundException,
                         QueueJobException {
 
                 UUID userId = Utils.resolveCurrentUserId(authenticationToken);

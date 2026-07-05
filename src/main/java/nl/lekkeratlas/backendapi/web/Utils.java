@@ -5,7 +5,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
-import nl.lekkeratlas.backendapi.exceptions.JWTException;
+import nl.lekkeratlas.backendapi.exceptions.JsonWebTokenException;
 
 public class Utils {
         private Utils() {
@@ -19,11 +19,12 @@ public class Utils {
          * 
          * @throws JWTException
          */
-        public static UUID resolveCurrentUserId(JwtAuthenticationToken authenticationToken) throws JWTException {
+        public static UUID resolveCurrentUserId(JwtAuthenticationToken authenticationToken)
+                        throws JsonWebTokenException {
                 String subject = authenticationToken.getToken().getSubject();
 
                 if (subject == null || subject.isBlank()) {
-                        throw new JWTException(HttpStatus.BAD_REQUEST,
+                        throw new JsonWebTokenException(HttpStatus.BAD_REQUEST,
                                         "Authenticated JWT does not contain a subject claim");
                 }
 

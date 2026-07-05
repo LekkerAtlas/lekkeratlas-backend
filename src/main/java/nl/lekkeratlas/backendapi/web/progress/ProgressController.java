@@ -19,7 +19,7 @@ import io.github.david.auk.fluid.jdbc.components.Database;
 import io.github.david.auk.fluid.jdbc.components.daos.Dao;
 import io.github.david.auk.fluid.jdbc.components.daos.QueryBuilder;
 import io.github.david.auk.fluid.jdbc.factories.DAOFactory;
-import nl.lekkeratlas.backendapi.exceptions.JWTException;
+import nl.lekkeratlas.backendapi.exceptions.JsonWebTokenException;
 import nl.lekkeratlas.backendapi.exceptions.QueueException;
 import nl.lekkeratlas.backendapi.exceptions.QueueJobException;
 import nl.lekkeratlas.backendapi.web.Utils;
@@ -38,7 +38,7 @@ public class ProgressController {
         @GetMapping("/{queueJobId}")
         public ResponseEntity<GetProgressResponse> getProgress(@PathVariable UUID queueJobId,
                         JwtAuthenticationToken authenticationToken)
-                        throws SQLException, NoSuchFieldException, JWTException,
+                        throws SQLException, NoSuchFieldException, JsonWebTokenException,
                         UserNotFoundException, QueueException {
 
                 validateQueueJobId(queueJobId);
