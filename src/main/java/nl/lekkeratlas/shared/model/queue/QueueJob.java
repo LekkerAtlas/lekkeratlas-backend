@@ -136,6 +136,11 @@ public class QueueJob implements TableEntity, Serializable {
         }
 
         public boolean isCanceled() {
-                return getStatus() == QueueJobStatus.CANCELED || getParentJob().isCanceled();
+                boolean parentJobIsCanceled = false;
+                if (parentJob != null) {
+                        parentJobIsCanceled = parentJob.isCanceled();
+                }
+
+                return getStatus() == QueueJobStatus.CANCELED || parentJobIsCanceled;
         }
 }
