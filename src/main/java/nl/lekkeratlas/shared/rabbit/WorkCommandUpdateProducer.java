@@ -1,18 +1,19 @@
 package nl.lekkeratlas.shared.rabbit;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.time.Instant;
+import java.util.UUID;
+
+import org.springframework.amqp.AmqpRejectAndDontRequeueException;
+import org.springframework.stereotype.Service;
+
 import io.github.david.auk.fluid.jdbc.components.Database;
 import io.github.david.auk.fluid.jdbc.components.daos.Dao;
 import io.github.david.auk.fluid.jdbc.factories.DAOFactory;
 import nl.lekkeratlas.shared.model.queue.QueueJob;
 import nl.lekkeratlas.shared.model.queue.QueueJobEvent;
 import nl.lekkeratlas.shared.model.queue.QueueJobStatus;
-import org.springframework.amqp.AmqpRejectAndDontRequeueException;
-import org.springframework.stereotype.Service;
-
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.time.Instant;
-import java.util.UUID;
 
 @Service
 public class WorkCommandUpdateProducer {

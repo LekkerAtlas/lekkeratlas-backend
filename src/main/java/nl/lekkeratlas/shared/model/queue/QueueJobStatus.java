@@ -32,4 +32,8 @@ public enum QueueJobStatus {
         public boolean isStopped() {
                 return this == CANCELED || this == FAILED;
         }
+
+        public boolean canCancel() {
+                return !isFinished();
+        }
 }

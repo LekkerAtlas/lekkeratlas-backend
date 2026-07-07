@@ -56,7 +56,7 @@ dependencies {
 
 	// Fluid JDBC
 
-	implementation("io.github.david-auk:fluid-jdbc:0.1.7")
+	implementation("io.github.david-auk:fluid-jdbc:0.1.8")
 	implementation("org.postgresql:postgresql:42.7.11")
 }
 

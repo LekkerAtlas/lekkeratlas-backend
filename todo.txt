@@ -3,3 +3,4 @@ x 2026-06-25 2026-06-25 test
 (B) Improve README landing page docs
 (C) Detect Arm systems to apply the docker overwrite automatically
 (A) Add controller parameter annotation to get the current user (checked if exists) within the parameters
+(A) Improve the robustness of queue job event status update from completed to canceled within the worker

@@ -40,7 +40,8 @@ import nl.lekkeratlas.shared.model.queue.QueueJobType;
 import nl.lekkeratlas.shared.model.user.User;
 import nl.lekkeratlas.shared.rabbit.WorkCommandProducer;
 import nl.lekkeratlas.shared.rabbit.WorkCommandUpdateProducer;
-import nl.lekkeratlas.worker.exceptions.CanceledQueueJobException;
+import nl.lekkeratlas.worker.cancellation.QueueJobCancellationMonitor;
+import nl.lekkeratlas.worker.cancellation.QueueJobCancellationWatch;
 import nl.lekkeratlas.worker.exceptions.FailedQueueJobException;
 import nl.lekkeratlas.worker.exceptions.QueueJobException;
 import nl.lekkeratlas.worker.scraper.ChannelScraper;
@@ -59,6 +60,7 @@ public class FetchPlatformContentCommandHandler {
 
         private final ChannelScraper channelScraper;
         private final WorkCommandProducer workCommandProducer;
+        private final QueueJobCancellationMonitor cancellationMonitor;
         private final WorkCommandUpdateProducer workCommandUpdateProducer;
         private final UserLookupService userLookupService;
         private final QueueJobLookupService queueJobLookupService;
@@ -66,13 +68,17 @@ public class FetchPlatformContentCommandHandler {
         public FetchPlatformContentCommandHandler(
                         ChannelScraper channelScraper,
                         WorkCommandProducer workCommandProducer,
-                        WorkCommandUpdateProducer workCommandUpdateProducer, UserLookupService userLookupService,
-                        QueueJobLookupService queueJobLookupService) {
+                        WorkCommandUpdateProducer workCommandUpdateProducer,
+                        UserLookupService userLookupService,
+                        QueueJobLookupService queueJobLookupService,
+                        QueueJobCancellationMonitor cancellationMonitor) {
+
                 this.channelScraper = channelScraper;
                 this.workCommandProducer = workCommandProducer;
                 this.workCommandUpdateProducer = workCommandUpdateProducer;
                 this.userLookupService = userLookupService;
                 this.queueJobLookupService = queueJobLookupService;
+                this.cancellationMonitor = cancellationMonitor;
         }
 
         public void handle(
@@ -98,57 +104,64 @@ public class FetchPlatformContentCommandHandler {
                                         "Channel ID cannot be empty");
                 }
 
-                ChannelOverviewResponse channelOverviewResponse;
+                try (QueueJobCancellationWatch cancellationWatch = cancellationMonitor.watch(scrapeChannelQueueJob)) {
 
-                QueueJobStatus status;
-                String message;
+                        ChannelOverviewResponse channelOverviewResponse;
 
-                try {
-                        workCommandUpdateProducer.update(
-                                        scrapeChannelQueueJob,
-                                        QueueJobStatus.RUNNING,
-                                        "Beginning scraping channel " + command.channelId());
-                        channelOverviewResponse = channelScraper.findVideoIds(channelId);
-                        if (channelOverviewResponse == null) {
+                        try {
+                                workCommandUpdateProducer.update(
+                                                scrapeChannelQueueJob,
+                                                QueueJobStatus.RUNNING,
+                                                "Beginning scraping channel " + command.channelId());
+
+                                channelOverviewResponse = channelScraper.findVideoIds(channelId);
+
+                                if (channelOverviewResponse == null) {
+
+                                        throw new FailedQueueJobException(
+                                                        scrapeChannelQueueJob,
+                                                        "channelOverviewResponse has null value",
+                                                        "Channel not found: " + channelId);
+
+                                }
+                        } catch (InterruptedException exception) {
+
+                                Thread.currentThread().interrupt();
+
+                                // Ignore the interruption because we support the cancelation of processes
+                                return;
+
+                        } catch (IOException exception) {
                                 throw new FailedQueueJobException(
                                                 scrapeChannelQueueJob,
-                                                "channelOverviewResponse has null value",
-                                                "Channel not found: " + channelId);
+                                                exception);
+
                         }
-                        status = QueueJobStatus.RUNNING;
-                        message = "Retrieved " + channelOverviewResponse.videos().size() + " videos for: " +
-                                        channelOverviewResponse.channel().title();
-                } catch (IOException e) {
-                        throw new FailedQueueJobException(scrapeChannelQueueJob, e);
-                } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
 
-                        throw new CanceledQueueJobException(
-                                        scrapeChannelQueueJob,
-                                        "User interrupted scraping channel",
-                                        "Channel scraping was interrupted for channel " + channelId);
-                }
+                        try (Connection connection = Database.getConnection()) {
+                                workCommandUpdateProducer.update(
+                                                connection,
+                                                scrapeChannelQueueJob,
+                                                QueueJobStatus.RUNNING,
+                                                "Retrieved " + channelOverviewResponse.videos().size() + " videos for: "
+                                                                +
+                                                                channelOverviewResponse.channel().title());
 
-                try (Connection connection = Database.getConnection()) {
-                        workCommandUpdateProducer.update(
-                                        connection,
-                                        scrapeChannelQueueJob,
-                                        status,
-                                        message);
+                                YoutubeChannel youtubeChannel = addYoutubeChannel(channelOverviewResponse.channel(),
+                                                user);
+                                syncVideos(
+                                                connection,
+                                                channelOverviewResponse,
+                                                youtubeChannel,
+                                                user,
+                                                scrapeChannelQueueJob);
 
-                        YoutubeChannel youtubeChannel = addYoutubeChannel(channelOverviewResponse.channel(), user);
-                        syncVideos(
-                                        connection,
-                                        channelOverviewResponse,
-                                        youtubeChannel,
-                                        user,
-                                        scrapeChannelQueueJob);
-
-                        workCommandUpdateProducer.update(
-                                        connection,
-                                        scrapeChannelQueueJob,
-                                        QueueJobStatus.COMPLETED,
-                                        "Finished scraping channel " + channelId);
+                                workCommandUpdateProducer.update(
+                                                connection,
+                                                scrapeChannelQueueJob,
+                                                QueueJobStatus.COMPLETED,
+                                                "Finished scraping channel " + channelId);
+                        }
                 }
         }
 
