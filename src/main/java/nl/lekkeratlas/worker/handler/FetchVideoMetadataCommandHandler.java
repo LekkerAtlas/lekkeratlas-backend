@@ -23,17 +23,19 @@ import nl.lekkeratlas.shared.model.content.hostedcontent.HostedContent;
 import nl.lekkeratlas.shared.model.queue.QueueJob;
 import nl.lekkeratlas.shared.model.queue.QueueJobStatus;
 import nl.lekkeratlas.shared.rabbit.WorkCommandUpdateProducer;
-import nl.lekkeratlas.worker.exceptions.CanceledQueueJobException;
 import nl.lekkeratlas.worker.exceptions.FailedQueueJobException;
 import nl.lekkeratlas.worker.exceptions.QueueJobException;
+import nl.lekkeratlas.worker.execution.QueueJobCancellationToken;
 import nl.lekkeratlas.worker.scraper.VideoMetadataScraper;
 import nl.lekkeratlas.worker.service.QueueJobLookupService;
 import nl.lekkeratlas.worker.service.UserLookupService;
 
 /**
  * Handles video imports.
+ *
  * <p>
- * Both directly added videos and videos discovered from channels end up here.
+ * Both directly added videos and videos discovered from channels end up
+ * here.
  */
 @Component
 public class FetchVideoMetadataCommandHandler {
@@ -45,8 +47,10 @@ public class FetchVideoMetadataCommandHandler {
 
         public FetchVideoMetadataCommandHandler(
                         VideoMetadataScraper videoMetadataScraper,
-                        WorkCommandUpdateProducer workCommandUpdateProducer, UserLookupService userLookupService,
+                        WorkCommandUpdateProducer workCommandUpdateProducer,
+                        UserLookupService userLookupService,
                         QueueJobLookupService queueJobLookupService) {
+
                 this.videoMetadataScraper = videoMetadataScraper;
                 this.workCommandUpdateProducer = workCommandUpdateProducer;
                 this.userLookupService = userLookupService;
@@ -54,47 +58,86 @@ public class FetchVideoMetadataCommandHandler {
         }
 
         /**
-         * TODO fill
-         * 
-         * @param envelope
-         * @param command
-         * @throws QueueJobException
+         * Handles a video-metadata command.
+         *
+         * @param envelope     the incoming queued request
+         * @param command      the video-metadata command
+         * @param cancellation cancellation state for this queue-job execution
+         * @throws QueueJobException when the queue job fails or is canceled
          */
         public void handle(
                         WorkCommandEnvelope envelope,
-                        FetchVideoMetadataCommand command) throws QueueJobException {
-                QueueJob scrapeVideoQueueJob = validateAndLoadScrapeVideoQueueJob(envelope, command);
+                        FetchVideoMetadataCommand command,
+                        QueueJobCancellationToken cancellation)
+                        throws QueueJobException {
 
-                if (scrapeVideoQueueJob.isCanceled())
-                        throw new CanceledQueueJobException(scrapeVideoQueueJob, "job marked as canceled",
-                                        "Canceled Job");
+                QueueJob scrapeVideoQueueJob = validateAndLoadScrapeVideoQueueJob(
+                                envelope,
+                                command);
 
-                Video videoMetadata = scrapeVideoMetadata(scrapeVideoQueueJob, command.videoId());
+                /*
+                 * Handle jobs that were already canceled before this handler
+                 * started. This closes the small gap before the cancellation
+                 * monitor performs its first poll.
+                 */
+                if (scrapeVideoQueueJob.isCanceled()) {
+                        throw cancellation.canceledException(
+                                        "Video metadata job was canceled before execution");
+                }
 
-                saveVideoMetadata(command, scrapeVideoQueueJob, videoMetadata);
+                cancellation.checkpoint(
+                                "Video metadata job was canceled before scraping started");
+
+                Video videoMetadata = scrapeVideoMetadata(
+                                scrapeVideoQueueJob,
+                                command.videoId(),
+                                cancellation);
+
+                cancellation.checkpoint(
+                                "Video metadata job was canceled after scraping");
+
+                saveVideoMetadata(
+                                command,
+                                scrapeVideoQueueJob,
+                                videoMetadata,
+                                cancellation);
         }
 
         /**
-         * @param envelope The incomming queued request
-         * @param command  The command that
-         * @return A validated QueueJob object that is from the same user
-         *         that made the request
+         * Loads and validates the user and queue job associated with the
+         * command.
+         *
+         * @param envelope the incoming queued request
+         * @param command  the command being handled
+         * @return the related queue job
          */
         private QueueJob validateAndLoadScrapeVideoQueueJob(
                         WorkCommandEnvelope envelope,
                         FetchVideoMetadataCommand command) {
-                try (Connection connection = Database.getConnection()) {
-                        userLookupService.requireExistingUser(connection, command.requestedByUserId());
 
-                        return queueJobLookupService.requireQueueJob(connection, envelope.commandId());
-                } catch (SQLException e) {
-                        throw new AmqpRejectAndDontRequeueException(e);
+                try (Connection connection = Database.getConnection()) {
+                        userLookupService.requireExistingUser(
+                                        connection,
+                                        command.requestedByUserId());
+
+                        return queueJobLookupService.requireQueueJob(
+                                        connection,
+                                        envelope.commandId());
+                } catch (SQLException exception) {
+                        throw new AmqpRejectAndDontRequeueException(
+                                        exception);
                 }
         }
 
         private Video scrapeVideoMetadata(
                         QueueJob scrapeVideoQueueJob,
-                        String videoId) throws QueueJobException {
+                        String videoId,
+                        QueueJobCancellationToken cancellation)
+                        throws QueueJobException {
+
+                cancellation.checkpoint(
+                                "Video metadata job was canceled before starting the scraper");
+
                 try {
                         workCommandUpdateProducer.update(
                                         scrapeVideoQueueJob,
@@ -103,26 +146,50 @@ public class FetchVideoMetadataCommandHandler {
 
                         Video videoMetadata = videoMetadataScraper.scrape(videoId);
 
-                        requireValidVideoMetadata(scrapeVideoQueueJob, videoId,
+                        cancellation.checkpoint(
+                                        "Video metadata job was canceled while scraping video "
+                                                        + videoId);
+
+                        requireValidVideoMetadata(
+                                        scrapeVideoQueueJob,
+                                        videoId,
                                         videoMetadata);
 
                         return videoMetadata;
-                } catch (IOException e) {
-                        throw new FailedQueueJobException(scrapeVideoQueueJob, e);
-                } catch (InterruptedException e) {
+                } catch (InterruptedException exception) {
+                        /*
+                         * The cancellation monitor marks the token before
+                         * interrupting the dedicated queue-job thread.
+                         */
+                        if (cancellation.isCancellationRequested()) {
+                                throw cancellation.canceledException(
+                                                "Video scraping was canceled for "
+                                                                + videoId);
+                        }
+
+                        /*
+                         * This interruption did not originate from a user
+                         * cancellation. Preserve it and report the execution as
+                         * failed.
+                         */
                         Thread.currentThread().interrupt();
 
-                        throw new CanceledQueueJobException(
+                        throw new FailedQueueJobException(
                                         scrapeVideoQueueJob,
-                                        "User interrupted scraping video",
-                                        "Video scraping was interrupted for " + videoId);
+                                        exception);
+                } catch (IOException exception) {
+                        throw new FailedQueueJobException(
+                                        scrapeVideoQueueJob,
+                                        exception);
                 }
         }
 
         private void requireValidVideoMetadata(
                         QueueJob scrapeVideoQueueJob,
                         String videoId,
-                        Video videoMetadata) throws FailedQueueJobException {
+                        Video videoMetadata)
+                        throws FailedQueueJobException {
+
                 if (videoMetadata == null) {
                         throw new FailedQueueJobException(
                                         scrapeVideoQueueJob,
@@ -131,8 +198,9 @@ public class FetchVideoMetadataCommandHandler {
                 }
 
                 if (videoMetadata.getTitle() == null
-                                || videoMetadata.getTitle().isEmpty()
+                                || videoMetadata.getTitle().isBlank()
                                 || videoMetadata.getPublishedAt() == null) {
+
                         throw new FailedQueueJobException(
                                         scrapeVideoQueueJob,
                                         "Scraped video data is missing a required value",
@@ -143,34 +211,65 @@ public class FetchVideoMetadataCommandHandler {
         private void saveVideoMetadata(
                         FetchVideoMetadataCommand command,
                         QueueJob scrapeVideoQueueJob,
-                        Video videoMetadata) throws QueueJobException {
-                try (Connection connection = Database.getConnection()) {
-                        requireExistingContentPlatform(connection, command, scrapeVideoQueueJob);
+                        Video videoMetadata,
+                        QueueJobCancellationToken cancellation)
+                        throws QueueJobException {
 
-                        saveContentAndHostedContent(connection, command, videoMetadata);
+                try (Connection connection = Database.getConnection()) {
+                        cancellation.checkpoint(
+                                        "Video metadata job was canceled before validating the content platform");
+
+                        requireExistingContentPlatform(
+                                        connection,
+                                        command,
+                                        scrapeVideoQueueJob);
+
+                        cancellation.checkpoint(
+                                        "Video metadata job was canceled before saving the video");
+
+                        saveContentAndHostedContent(
+                                        connection,
+                                        command,
+                                        videoMetadata);
+
+                        /*
+                         * Prevent a cancellation near the end of the operation
+                         * from being overwritten by COMPLETED.
+                         */
+                        cancellation.checkpoint(
+                                        "Video metadata job was canceled before completion");
 
                         workCommandUpdateProducer.update(
                                         connection,
                                         scrapeVideoQueueJob,
                                         QueueJobStatus.COMPLETED,
-                                        "Saved video metadata for " + videoMetadata.getTitle());
-                } catch (SQLException e) {
-                        throw new AmqpRejectAndDontRequeueException(e);
+                                        "Saved video metadata for "
+                                                        + videoMetadata.getTitle());
+                } catch (SQLException exception) {
+                        throw new AmqpRejectAndDontRequeueException(
+                                        exception);
                 }
         }
 
         private void requireExistingContentPlatform(
                         Connection connection,
                         FetchVideoMetadataCommand command,
-                        QueueJob scrapeVideoQueueJob) throws FailedQueueJobException {
+                        QueueJob scrapeVideoQueueJob)
+                        throws FailedQueueJobException {
+
                 try (Dao<ContentPlatform, UUID> contentPlatformDao = DAOFactory.createDAO(
                                 connection,
                                 ContentPlatform.class)) {
-                        if (!contentPlatformDao.existsByPrimaryKey(command.contentPlatformId())) {
+
+                        if (!contentPlatformDao.existsByPrimaryKey(
+                                        command.contentPlatformId())) {
+
                                 throw new FailedQueueJobException(
                                                 scrapeVideoQueueJob,
-                                                "ContentPlatform ID has null value for video " + command.videoId(),
-                                                "Could not find related content platform, please inform the administrator");
+                                                "ContentPlatform ID has null value for video "
+                                                                + command.videoId(),
+                                                "Could not find related content platform, "
+                                                                + "please inform the administrator");
                         }
                 }
         }
@@ -179,15 +278,24 @@ public class FetchVideoMetadataCommandHandler {
                         Connection connection,
                         FetchVideoMetadataCommand command,
                         Video videoMetadata) {
+
                 try (
-                                Dao<Content, UUID> contentDao = DAOFactory.createDAO(connection, Content.class);
-                                Dao<HostedContent, UUID> hostedContentDao = DAOFactory.createDAO(connection,
+                                Dao<Content, UUID> contentDao = DAOFactory.createDAO(
+                                                connection,
+                                                Content.class);
+
+                                Dao<HostedContent, UUID> hostedContentDao = DAOFactory.createDAO(
+                                                connection,
                                                 HostedContent.class)) {
+
                         Content content = createContent(videoMetadata);
 
                         contentDao.add(content);
 
-                        HostedContent hostedContent = createHostedContent(command, videoMetadata, content);
+                        HostedContent hostedContent = createHostedContent(
+                                        command,
+                                        videoMetadata,
+                                        content);
 
                         hostedContentDao.add(hostedContent);
                 }
@@ -211,12 +319,17 @@ public class FetchVideoMetadataCommandHandler {
                         FetchVideoMetadataCommand command,
                         Video videoMetadata,
                         Content content) {
+
                 return new HostedContent(
                                 UUID.randomUUID(),
                                 content,
 
-                                // Insert an empty content platform, the ID is validated before saving
-                                ContentPlatform.getDummyContentPlatform(command.contentPlatformId()),
+                                /*
+                                 * Insert a placeholder content platform. Its ID
+                                 * was validated before saving.
+                                 */
+                                ContentPlatform.getDummyContentPlatform(
+                                                command.contentPlatformId()),
                                 videoMetadata.getId());
         }
 }

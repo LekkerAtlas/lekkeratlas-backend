@@ -40,27 +40,26 @@ import nl.lekkeratlas.shared.model.queue.QueueJobType;
 import nl.lekkeratlas.shared.model.user.User;
 import nl.lekkeratlas.shared.rabbit.WorkCommandProducer;
 import nl.lekkeratlas.shared.rabbit.WorkCommandUpdateProducer;
-import nl.lekkeratlas.worker.cancellation.QueueJobCancellationMonitor;
-import nl.lekkeratlas.worker.cancellation.QueueJobCancellationWatch;
 import nl.lekkeratlas.worker.exceptions.FailedQueueJobException;
 import nl.lekkeratlas.worker.exceptions.QueueJobException;
+import nl.lekkeratlas.worker.execution.QueueJobCancellationToken;
 import nl.lekkeratlas.worker.scraper.ChannelScraper;
 import nl.lekkeratlas.worker.service.QueueJobLookupService;
 import nl.lekkeratlas.worker.service.UserLookupService;
 
 /**
  * Handles channel imports.
+ *
  * <p>
- * This handler should only discover videos and enqueue
- * FetchVideoMetadataCommand messages.
- * The actual metadata scraping belongs in FetchVideoMetadataCommandHandler.
+ * This handler discovers videos and enqueues
+ * {@link FetchVideoMetadataCommand} messages. Metadata scraping is handled by
+ * {@link FetchVideoMetadataCommandHandler}.
  */
 @Component
 public class FetchPlatformContentCommandHandler {
 
         private final ChannelScraper channelScraper;
         private final WorkCommandProducer workCommandProducer;
-        private final QueueJobCancellationMonitor cancellationMonitor;
         private final WorkCommandUpdateProducer workCommandUpdateProducer;
         private final UserLookupService userLookupService;
         private final QueueJobLookupService queueJobLookupService;
@@ -70,98 +69,144 @@ public class FetchPlatformContentCommandHandler {
                         WorkCommandProducer workCommandProducer,
                         WorkCommandUpdateProducer workCommandUpdateProducer,
                         UserLookupService userLookupService,
-                        QueueJobLookupService queueJobLookupService,
-                        QueueJobCancellationMonitor cancellationMonitor) {
+                        QueueJobLookupService queueJobLookupService) {
 
                 this.channelScraper = channelScraper;
                 this.workCommandProducer = workCommandProducer;
                 this.workCommandUpdateProducer = workCommandUpdateProducer;
                 this.userLookupService = userLookupService;
                 this.queueJobLookupService = queueJobLookupService;
-                this.cancellationMonitor = cancellationMonitor;
         }
 
         public void handle(
                         WorkCommandEnvelope envelope,
-                        FetchPlatformContentCommand command)
+                        FetchPlatformContentCommand command,
+                        QueueJobCancellationToken cancellation)
                         throws QueueJobException, SQLException, NoSuchFieldException {
+
                 User user;
                 QueueJob scrapeChannelQueueJob;
-                try (Connection connection = Database.getConnection()) {
 
-                        // Enforce that the necessary values are present
-                        user = userLookupService.requireExistingUser(connection, command.requestedByUserId());
-                        scrapeChannelQueueJob = queueJobLookupService.requireCleanQueueJob(connection,
+                try (Connection connection = Database.getConnection()) {
+                        user = userLookupService.requireExistingUser(
+                                        connection,
+                                        command.requestedByUserId());
+
+                        scrapeChannelQueueJob = queueJobLookupService.requireCleanQueueJob(
+                                        connection,
                                         envelope.commandId());
                 }
 
                 String channelId = command.channelId();
 
-                if (channelId == null || channelId.isEmpty()) {
+                if (channelId == null || channelId.isBlank()) {
                         throw new FailedQueueJobException(
                                         scrapeChannelQueueJob,
-                                        "User gave a empty request",
+                                        "User gave an empty request",
                                         "Channel ID cannot be empty");
                 }
 
-                try (QueueJobCancellationWatch cancellationWatch = cancellationMonitor.watch(scrapeChannelQueueJob)) {
+                cancellation.checkpoint(
+                                "Channel import was canceled before scraping started");
 
-                        ChannelOverviewResponse channelOverviewResponse;
+                workCommandUpdateProducer.update(
+                                scrapeChannelQueueJob,
+                                QueueJobStatus.RUNNING,
+                                "Beginning scraping channel " + channelId);
 
-                        try {
-                                workCommandUpdateProducer.update(
-                                                scrapeChannelQueueJob,
-                                                QueueJobStatus.RUNNING,
-                                                "Beginning scraping channel " + command.channelId());
+                ChannelOverviewResponse channelOverviewResponse = fetchChannelOverview(
+                                channelId,
+                                scrapeChannelQueueJob,
+                                cancellation);
 
-                                channelOverviewResponse = channelScraper.findVideoIds(channelId);
+                cancellation.checkpoint(
+                                "Channel import was canceled after scraping the channel");
 
-                                if (channelOverviewResponse == null) {
+                if (channelOverviewResponse == null) {
+                        throw new FailedQueueJobException(
+                                        scrapeChannelQueueJob,
+                                        "channelOverviewResponse has null value",
+                                        "Channel not found: " + channelId);
+                }
 
-                                        throw new FailedQueueJobException(
-                                                        scrapeChannelQueueJob,
-                                                        "channelOverviewResponse has null value",
-                                                        "Channel not found: " + channelId);
+                try (Connection connection = Database.getConnection()) {
+                        workCommandUpdateProducer.update(
+                                        connection,
+                                        scrapeChannelQueueJob,
+                                        QueueJobStatus.RUNNING,
+                                        "Retrieved "
+                                                        + channelOverviewResponse.videos().size()
+                                                        + " videos for: "
+                                                        + channelOverviewResponse
+                                                                        .channel()
+                                                                        .title());
 
-                                }
-                        } catch (InterruptedException exception) {
+                        cancellation.checkpoint(
+                                        "Channel import was canceled before saving the channel");
 
-                                Thread.currentThread().interrupt();
+                        YoutubeChannel youtubeChannel = addYoutubeChannel(
+                                        channelOverviewResponse.channel(),
+                                        user);
 
-                                // Ignore the interruption because we support the cancelation of processes
-                                return;
+                        cancellation.checkpoint(
+                                        "Channel import was canceled before synchronizing videos");
 
-                        } catch (IOException exception) {
-                                throw new FailedQueueJobException(
-                                                scrapeChannelQueueJob,
-                                                exception);
+                        syncVideos(
+                                        connection,
+                                        channelOverviewResponse,
+                                        youtubeChannel,
+                                        user,
+                                        scrapeChannelQueueJob,
+                                        cancellation);
 
+                        /*
+                         * Check immediately before marking the job completed.
+                         * This prevents a cancellation registered near the end
+                         * from being overwritten by COMPLETED.
+                         */
+                        cancellation.checkpoint(
+                                        "Channel import was canceled before completion");
+
+                        workCommandUpdateProducer.update(
+                                        connection,
+                                        scrapeChannelQueueJob,
+                                        QueueJobStatus.COMPLETED,
+                                        "Finished scraping channel " + channelId);
+                }
+        }
+
+        private ChannelOverviewResponse fetchChannelOverview(
+                        String channelId,
+                        QueueJob queueJob,
+                        QueueJobCancellationToken cancellation)
+                        throws QueueJobException {
+
+                try {
+                        return channelScraper.findVideoIds(channelId);
+                } catch (InterruptedException exception) {
+                        /*
+                         * An expected cancellation interrupt is translated into
+                         * a domain-level CANCELED exception.
+                         */
+                        if (cancellation.isCancellationRequested()) {
+                                throw cancellation.canceledException(
+                                                "Channel scraping was canceled for channel "
+                                                                + channelId);
                         }
 
-                        try (Connection connection = Database.getConnection()) {
-                                workCommandUpdateProducer.update(
-                                                connection,
-                                                scrapeChannelQueueJob,
-                                                QueueJobStatus.RUNNING,
-                                                "Retrieved " + channelOverviewResponse.videos().size() + " videos for: "
-                                                                +
-                                                                channelOverviewResponse.channel().title());
+                        /*
+                         * This interruption was not triggered by queue-job
+                         * cancellation, so preserve it and report a failure.
+                         */
+                        Thread.currentThread().interrupt();
 
-                                YoutubeChannel youtubeChannel = addYoutubeChannel(channelOverviewResponse.channel(),
-                                                user);
-                                syncVideos(
-                                                connection,
-                                                channelOverviewResponse,
-                                                youtubeChannel,
-                                                user,
-                                                scrapeChannelQueueJob);
-
-                                workCommandUpdateProducer.update(
-                                                connection,
-                                                scrapeChannelQueueJob,
-                                                QueueJobStatus.COMPLETED,
-                                                "Finished scraping channel " + channelId);
-                        }
+                        throw new FailedQueueJobException(
+                                        queueJob,
+                                        exception);
+                } catch (IOException exception) {
+                        throw new FailedQueueJobException(
+                                        queueJob,
+                                        exception);
                 }
         }
 
@@ -170,32 +215,64 @@ public class FetchPlatformContentCommandHandler {
                         ChannelOverviewResponse response,
                         YoutubeChannel youtubeChannel,
                         User user,
-                        QueueJob parentQueueJob) throws NoSuchFieldException {
-                List<HostedContent> existingVideos = findExistingVideos(connection, youtubeChannel);
+                        QueueJob parentQueueJob,
+                        QueueJobCancellationToken cancellation)
+                        throws NoSuchFieldException, QueueJobException {
+
+                List<HostedContent> existingVideos = findExistingVideos(
+                                connection,
+                                youtubeChannel);
 
                 Map<String, HostedContent> existingByExternalId = existingVideos.stream()
-                                .collect(Collectors.toMap(HostedContent::externalContentId, video -> video));
+                                .collect(Collectors.toMap(
+                                                HostedContent::externalContentId,
+                                                video -> video));
 
                 List<PartialVideo> newVideos = new ArrayList<>();
 
                 for (PartialVideo partialVideo : response.videos()) {
-                        HostedContent existingVideo = existingByExternalId.get(partialVideo.id());
+                        cancellation.checkpoint(
+                                        "Channel import was canceled while synchronizing videos");
+
+                        HostedContent existingVideo = existingByExternalId.get(
+                                        partialVideo.id());
 
                         if (existingVideo == null) {
                                 newVideos.add(partialVideo);
                                 continue;
                         }
 
-                        updateExistingVideo(connection, existingVideo, partialVideo);
+                        updateExistingVideo(
+                                        connection,
+                                        existingVideo,
+                                        partialVideo);
                 }
 
-                addVideos(connection, newVideos, youtubeChannel, user, parentQueueJob);
+                addVideos(
+                                connection,
+                                newVideos,
+                                youtubeChannel,
+                                user,
+                                parentQueueJob,
+                                cancellation);
         }
 
-        private void addVideos(Connection connection, List<PartialVideo> videos, ContentPlatform contentPlatform,
-                        User requestedBy, QueueJob parentQueueJob) {
-                try (Dao<QueueJob, UUID> queueJobDao = DAOFactory.createDAO(connection, QueueJob.class)) {
+        private void addVideos(
+                        Connection connection,
+                        List<PartialVideo> videos,
+                        ContentPlatform contentPlatform,
+                        User requestedBy,
+                        QueueJob parentQueueJob,
+                        QueueJobCancellationToken cancellation)
+                        throws QueueJobException {
+
+                try (Dao<QueueJob, UUID> queueJobDao = DAOFactory.createDAO(
+                                connection,
+                                QueueJob.class)) {
+
                         for (PartialVideo video : videos) {
+                                cancellation.checkpoint(
+                                                "Channel import was canceled while creating metadata jobs");
 
                                 workCommandProducer.publish(
                                                 QueueJobType.FETCH_VIDEO_METADATA,
@@ -210,13 +287,19 @@ public class FetchPlatformContentCommandHandler {
                 }
         }
 
-        private List<HostedContent> findExistingVideos(Connection connection, YoutubeChannel youtubeChannel)
+        private List<HostedContent> findExistingVideos(
+                        Connection connection,
+                        YoutubeChannel youtubeChannel)
                         throws NoSuchFieldException {
-                try (Dao<HostedContent, UUID> hostedContentDao = DAOFactory.createDAO(connection,
+
+                try (Dao<HostedContent, UUID> hostedContentDao = DAOFactory.createDAO(
+                                connection,
                                 HostedContent.class)) {
+
                         return new QueryBuilder<>(hostedContentDao)
                                         .where(
-                                                        HostedContent.class.getDeclaredField("contentPlatform"),
+                                                        HostedContent.class.getDeclaredField(
+                                                                        "contentPlatform"),
                                                         EQUALS,
                                                         youtubeChannel.getId())
                                         .get();
@@ -227,41 +310,49 @@ public class FetchPlatformContentCommandHandler {
                         Connection connection,
                         HostedContent existingVideo,
                         PartialVideo partialVideo) {
-                Content content = existingVideo.content();
 
+                Content content = existingVideo.content();
                 content.setTitle(partialVideo.title());
 
-                try (Dao<Content, UUID> contentDao = DAOFactory.createDAO(connection, Content.class)) {
+                try (Dao<Content, UUID> contentDao = DAOFactory.createDAO(
+                                connection,
+                                Content.class)) {
+
                         contentDao.update(content);
                 }
         }
 
-        private YoutubeChannel addYoutubeChannel(Channel channel, User addedBy)
+        private YoutubeChannel addYoutubeChannel(
+                        Channel channel,
+                        User addedBy)
                         throws SQLException, NoSuchFieldException {
 
-                String channelId = channel.channelId().channelId(); // TODO Improve this naming in the scraper project
+                // TODO: Improve this naming in the scraper project.
+                String channelId = channel.channelId().channelId();
 
                 try (Connection transactionalConnection = Database.getConnection()) {
+
                         transactionalConnection.setAutoCommit(false);
 
-                        // Add to ContentPlatform table
                         try (
                                         DaoTransactional<ContentPlatform, UUID> contentPlatformDao = DAOFactory
                                                         .createTransactionalDAO(
                                                                         transactionalConnection,
                                                                         ContentPlatform.class);
+
                                         DaoTransactional<ContentVideoPlatform, UUID> contentVideoPlatformDao = DAOFactory
                                                         .createTransactionalDAO(
                                                                         transactionalConnection,
                                                                         ContentVideoPlatform.class);
+
                                         DaoTransactional<YoutubeChannel, UUID> youtubeChannelDao = DAOFactory
                                                         .createTransactionalDAO(
                                                                         transactionalConnection,
-                                                                        YoutubeChannel.class)
+                                                                        YoutubeChannel.class)) {
 
-                        ) {
-
-                                YoutubeChannel existingChannel = getYoutubeChannel(youtubeChannelDao, channelId);
+                                YoutubeChannel existingChannel = getYoutubeChannel(
+                                                youtubeChannelDao,
+                                                channelId);
 
                                 if (existingChannel != null) {
                                         return existingChannel;
@@ -284,22 +375,31 @@ public class FetchPlatformContentCommandHandler {
                                                 channelId);
 
                                 contentPlatformDao.add(contentPlatform);
-                                contentVideoPlatformDao.add(contentVideoPlatform);
+                                contentVideoPlatformDao.add(
+                                                contentVideoPlatform);
                                 youtubeChannelDao.add(youtubeChannel);
-                                transactionalConnection.commit();
-                                existingChannel = youtubeChannel;
 
-                                return existingChannel;
+                                transactionalConnection.commit();
+
+                                return youtubeChannel;
+                        } catch (SQLException | RuntimeException exception) {
+                                transactionalConnection.rollback();
+                                throw exception;
                         }
                 }
         }
 
-        private YoutubeChannel getYoutubeChannel(Dao<YoutubeChannel, UUID> youtubeChannelDao, String channelId)
+        private YoutubeChannel getYoutubeChannel(
+                        Dao<YoutubeChannel, UUID> youtubeChannelDao,
+                        String channelId)
                         throws NoSuchFieldException {
+
                 return new QueryBuilder<>(youtubeChannelDao)
-                                .where(YoutubeChannel.class.getDeclaredField("youtubeChannelId"),
-                                                EQUALS, channelId)
+                                .where(
+                                                YoutubeChannel.class.getDeclaredField(
+                                                                "youtubeChannelId"),
+                                                EQUALS,
+                                                channelId)
                                 .getUnique();
         }
-
 }

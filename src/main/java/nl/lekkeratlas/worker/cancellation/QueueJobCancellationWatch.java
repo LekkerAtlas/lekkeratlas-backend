@@ -1,8 +1,7 @@
 package nl.lekkeratlas.worker.cancellation;
 
+@FunctionalInterface
 public interface QueueJobCancellationWatch extends AutoCloseable {
-
-        boolean isCancellationRequested();
 
         @Override
         void close();
