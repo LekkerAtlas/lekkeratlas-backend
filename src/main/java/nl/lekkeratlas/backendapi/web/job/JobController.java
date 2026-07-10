@@ -31,7 +31,7 @@ public class JobController {
         }
 
         @PostMapping("/{jobId}/cancel")
-        // TODO Parse checked current user via the parameters
+        // TODO: Parse checked current user via the parameters
         public ResponseEntity<Void> cancelJob(@PathVariable UUID jobId, JwtAuthenticationToken authenticationToken)
                         throws JsonWebTokenException, UserNotFoundException, SQLException, QueueJobException {
 

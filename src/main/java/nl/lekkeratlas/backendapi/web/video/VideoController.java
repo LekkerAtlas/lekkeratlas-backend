@@ -26,7 +26,7 @@ public class VideoController {
         //
         // try (Dao<User, UUID> userDao = DAOFactory.createDAO(connection, User.class))
         // {
-        // // TODO Validate user
+        // // TODO: Validate user
         // }
         //
         // try (Dao<QueueJob, UUID> queueJobDao = DAOFactory.createDAO(connection,
