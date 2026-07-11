@@ -85,16 +85,14 @@ public class FetchVideoMetadataCommandHandler {
                                         "Video metadata job was canceled before execution");
                 }
 
-                cancellation.checkpoint(
-                                "Video metadata job was canceled before scraping started");
+                cancellation.checkpoint("Video metadata job was canceled before scraping started");
 
                 Video videoMetadata = scrapeVideoMetadata(
                                 scrapeVideoQueueJob,
                                 command.videoId(),
                                 cancellation);
 
-                cancellation.checkpoint(
-                                "Video metadata job was canceled after scraping");
+                cancellation.checkpoint("Video metadata job was canceled after scraping");
 
                 saveVideoMetadata(
                                 command,
@@ -135,8 +133,7 @@ public class FetchVideoMetadataCommandHandler {
                         QueueJobCancellationToken cancellation)
                         throws QueueJobException {
 
-                cancellation.checkpoint(
-                                "Video metadata job was canceled before starting the scraper");
+                cancellation.checkpoint("Video metadata job was canceled before starting the scraper");
 
                 try {
                         workCommandUpdateProducer.update(
@@ -146,9 +143,8 @@ public class FetchVideoMetadataCommandHandler {
 
                         Video videoMetadata = videoMetadataScraper.scrape(videoId);
 
-                        cancellation.checkpoint(
-                                        "Video metadata job was canceled while scraping video "
-                                                        + videoId);
+                        cancellation.checkpoint("Video metadata job was canceled while scraping video "
+                                        + videoId);
 
                         requireValidVideoMetadata(
                                         scrapeVideoQueueJob,
@@ -224,8 +220,7 @@ public class FetchVideoMetadataCommandHandler {
                                         command,
                                         scrapeVideoQueueJob);
 
-                        cancellation.checkpoint(
-                                        "Video metadata job was canceled before saving the video");
+                        cancellation.checkpoint("Video metadata job was canceled before saving the video");
 
                         saveContentAndHostedContent(
                                         connection,
@@ -236,8 +231,7 @@ public class FetchVideoMetadataCommandHandler {
                          * Prevent a cancellation near the end of the operation
                          * from being overwritten by COMPLETED.
                          */
-                        cancellation.checkpoint(
-                                        "Video metadata job was canceled before completion");
+                        cancellation.checkpoint("Video metadata job was canceled before completion");
 
                         workCommandUpdateProducer.update(
                                         connection,

@@ -47,12 +47,6 @@ public class QueueJob implements TableEntity, Serializable {
         @TableColumn(columnName = "dedupe_key")
         private final String dedupeKey;
 
-        @TableColumn(columnName = "error_type")
-        private final String errorType;
-
-        @TableColumn(columnName = "error_message")
-        private final String errorMessage;
-
         @TableColumn(columnName = "created_at")
         private final Instant createdAt;
 
@@ -66,8 +60,7 @@ public class QueueJob implements TableEntity, Serializable {
         @TableConstructor
         public QueueJob(UUID id, QueueJob parentJob, QueueJobType type, QueueJobStatus status,
                         Map<String, Serializable> payload, User requestedBy, String correlationKey, String dedupeKey,
-                        String errorType, String errorMessage, Instant createdAt, Instant startedAt,
-                        Instant finishedAt) {
+                        Instant createdAt, Instant startedAt, Instant finishedAt) {
                 this.id = id;
                 this.parentJob = parentJob;
                 this.type = type;
@@ -76,8 +69,6 @@ public class QueueJob implements TableEntity, Serializable {
                 this.requestedBy = requestedBy;
                 this.correlationKey = correlationKey;
                 this.dedupeKey = dedupeKey;
-                this.errorType = errorType;
-                this.errorMessage = errorMessage;
                 this.createdAt = createdAt;
                 this.startedAt = startedAt;
                 this.finishedAt = finishedAt;
@@ -113,14 +104,6 @@ public class QueueJob implements TableEntity, Serializable {
 
         public String getDedupeKey() {
                 return dedupeKey;
-        }
-
-        public String getErrorType() {
-                return errorType;
-        }
-
-        public String getErrorMessage() {
-                return errorMessage;
         }
 
         public Instant getCreatedAt() {

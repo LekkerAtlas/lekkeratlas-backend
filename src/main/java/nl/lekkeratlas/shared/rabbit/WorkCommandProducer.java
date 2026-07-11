@@ -41,8 +41,6 @@ public class WorkCommandProducer {
                                 User.getDummyUser(command.requestedByUserId()),
                                 command.correlationKey(),
                                 command.dedupeKey(),
-                                null,
-                                null,
                                 Instant.now(),
                                 null,
                                 null);

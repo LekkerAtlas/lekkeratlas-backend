@@ -82,18 +82,13 @@ public class ChannelController {
                                                         break;
                                                 }
                                         }
-
                                         if (existingJob != null) {
                                                 return ResponseEntity.accepted()
                                                                 .body(new CommandAcceptedResponse(existingJob.getId()));
                                         }
-
                                         QueueJob queueJob = workCommandProducer.publish(
-                                                        QueueJobType.FETCH_PLATFORM_CONTENT,
-                                                        command,
-                                                        null,
+                                                        QueueJobType.FETCH_PLATFORM_CONTENT, command, null,
                                                         queueJobDao);
-
                                         return ResponseEntity.accepted()
                                                         .body(new CommandAcceptedResponse(queueJob.getId()));
                                 }

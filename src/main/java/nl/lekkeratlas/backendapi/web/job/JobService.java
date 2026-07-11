@@ -12,8 +12,7 @@ import io.github.david.auk.fluid.jdbc.factories.DAOFactory;
 import nl.lekkeratlas.backendapi.exceptions.JobAlreadyFinishedException;
 import nl.lekkeratlas.backendapi.exceptions.QueueJobException;
 import nl.lekkeratlas.shared.model.queue.QueueJob;
-import nl.lekkeratlas.shared.model.queue.QueueJobEvent;
-import nl.lekkeratlas.shared.model.queue.QueueJobStatus;
+import nl.lekkeratlas.shared.model.queue.QueueJobCancellationRequest;
 import nl.lekkeratlas.shared.model.user.User;
 
 @Service
@@ -25,37 +24,37 @@ public class JobService {
 
                 try (Dao<QueueJob, UUID> queueJobDao = DAOFactory.createDAO(connection, QueueJob.class)) {
 
-                        QueueJob queueJob = queueJobDao.get(jobId);
+                        try (Dao<QueueJobCancellationRequest, UUID> queueJobCancellationRequestDao = DAOFactory
+                                        .createDAO(connection,
+                                                        QueueJobCancellationRequest.class)) {
+                                QueueJob queueJob = queueJobDao.get(jobId);
 
-                        if (queueJob == null)
-                                throw new QueueJobException("Queue job " + jobId + " not found");
+                                if (queueJob == null)
+                                        throw new QueueJobException("Queue job " + jobId + " not found");
 
-                        if (!user.getId().toString().equals(queueJob.getRequestedBy().getId().toString()))
-                                throw new QueueJobException("User did not create this QueueJob");
+                                if (!user.getId().equals(queueJob.getRequestedBy().getId()))
+                                        throw new QueueJobException("User did not create this QueueJob");
 
-                        switch (queueJob.getStatus()) {
-                                case COMPLETED:
-                                        throw new JobAlreadyFinishedException(queueJob);
-                                case FAILED:
-                                        throw new JobAlreadyFinishedException(queueJob);
-                                case CANCELED:
-                                        return;
-                                default:
-                                        createCanceledQueueJobEvent(connection, queueJob);
+                                switch (queueJob.getStatus()) {
+                                        case COMPLETED:
+                                                throw new JobAlreadyFinishedException(queueJob);
+                                        case FAILED:
+                                                throw new JobAlreadyFinishedException(queueJob);
+                                        case CANCELED:
+                                                return;
+                                        default:
+                                                createCanceledQueueJobEvent(queueJobCancellationRequestDao, queueJob);
+                                }
                         }
-
                 }
         }
 
-        public void createCanceledQueueJobEvent(Connection connection, QueueJob queueJob) {
-                try (Dao<QueueJobEvent, UUID> queueJobEventDao = DAOFactory.createDAO(connection,
-                                QueueJobEvent.class)) {
-                        QueueJobEvent queueJobEvent = new QueueJobEvent(UUID.randomUUID(), queueJob,
-                                        QueueJobStatus.CANCELED,
-                                        "Job canceled",
-                                        Instant.now());
+        public void createCanceledQueueJobEvent(Dao<QueueJobCancellationRequest, UUID> queueJobCancellationRequestDao,
+                        QueueJob queueJob) {
 
-                        queueJobEventDao.add(queueJobEvent);
-                }
+                QueueJobCancellationRequest queueJobCancellationRequest = new QueueJobCancellationRequest(queueJob,
+                                Instant.now());
+
+                queueJobCancellationRequestDao.add(queueJobCancellationRequest);
         }
 }

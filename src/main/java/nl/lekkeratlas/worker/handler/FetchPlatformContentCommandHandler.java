@@ -106,8 +106,7 @@ public class FetchPlatformContentCommandHandler {
                                         "Channel ID cannot be empty");
                 }
 
-                cancellation.checkpoint(
-                                "Channel import was canceled before scraping started");
+                cancellation.checkpoint("Channel import was canceled before scraping started");
 
                 workCommandUpdateProducer.update(
                                 scrapeChannelQueueJob,
@@ -119,8 +118,7 @@ public class FetchPlatformContentCommandHandler {
                                 scrapeChannelQueueJob,
                                 cancellation);
 
-                cancellation.checkpoint(
-                                "Channel import was canceled after scraping the channel");
+                cancellation.checkpoint("Channel import was canceled after scraping the channel");
 
                 if (channelOverviewResponse == null) {
                         throw new FailedQueueJobException(
@@ -141,15 +139,13 @@ public class FetchPlatformContentCommandHandler {
                                                                         .channel()
                                                                         .title());
 
-                        cancellation.checkpoint(
-                                        "Channel import was canceled before saving the channel");
+                        cancellation.checkpoint("Channel import was canceled before saving the channel");
 
                         YoutubeChannel youtubeChannel = addYoutubeChannel(
                                         channelOverviewResponse.channel(),
                                         user);
 
-                        cancellation.checkpoint(
-                                        "Channel import was canceled before synchronizing videos");
+                        cancellation.checkpoint("Channel import was canceled before synchronizing videos");
 
                         syncVideos(
                                         connection,
@@ -159,18 +155,7 @@ public class FetchPlatformContentCommandHandler {
                                         scrapeChannelQueueJob,
                                         cancellation);
 
-                        /*
-                         * Check immediately before marking the job completed.
-                         * This prevents a cancellation registered near the end
-                         * from being overwritten by COMPLETED.
-                         */
-                        cancellation.checkpoint(
-                                        "Channel import was canceled before completion");
-
-                        workCommandUpdateProducer.update(
-                                        connection,
-                                        scrapeChannelQueueJob,
-                                        QueueJobStatus.COMPLETED,
+                        workCommandUpdateProducer.update(connection, scrapeChannelQueueJob, QueueJobStatus.COMPLETED,
                                         "Finished scraping channel " + channelId);
                 }
         }
@@ -231,8 +216,7 @@ public class FetchPlatformContentCommandHandler {
                 List<PartialVideo> newVideos = new ArrayList<>();
 
                 for (PartialVideo partialVideo : response.videos()) {
-                        cancellation.checkpoint(
-                                        "Channel import was canceled while synchronizing videos");
+                        cancellation.checkpoint("Channel import was canceled while synchronizing videos");
 
                         HostedContent existingVideo = existingByExternalId.get(
                                         partialVideo.id());
@@ -271,8 +255,7 @@ public class FetchPlatformContentCommandHandler {
                                 QueueJob.class)) {
 
                         for (PartialVideo video : videos) {
-                                cancellation.checkpoint(
-                                                "Channel import was canceled while creating metadata jobs");
+                                cancellation.checkpoint("Channel import was canceled while creating metadata jobs");
 
                                 workCommandProducer.publish(
                                                 QueueJobType.FETCH_VIDEO_METADATA,
