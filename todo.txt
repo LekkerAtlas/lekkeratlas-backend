@@ -2,3 +2,9 @@ x 2026-06-28 2026-06-28 Add working justfile to improve DX +developer_expirience
 x 2026-06-25 2026-06-25 test
 (B) Improve README landing page docs
 (C) Detect Arm systems to apply the docker overwrite automatically
+(A) Add controller parameter annotation to get the current user (checked if exists) within the parameters
+(A) Improve the robustness of queue job event status update from completed to canceled within the worker
+x 2026-07-11 2026-07-11 Add new cancelation object
+x 2026-07-11 2026-07-11 Refactor existing cancel route
+x 2026-07-11 2026-07-11 Update cancelation detection logic
+2026-07-11 Update interupted detection -> DB cancelation message status logic

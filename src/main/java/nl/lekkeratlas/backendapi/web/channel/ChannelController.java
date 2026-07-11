@@ -67,7 +67,7 @@ public class ChannelController {
                                         List<QueueJob> existingJobs = new QueryBuilder<>(queueJobDao)
                                                         .where(QueueJob.class.getDeclaredField("dedupeKey"),
                                                                         SingleValueOperator.EQUALS, command.dedupeKey())
-                                                        // TODO Add OR when implemented in Fluid JDBC
+                                                        // TODO: Add OR when implemented in Fluid JDBC
                                                         // .and(QueueJob.class.getDeclaredField("status"),
                                                         // SingleValueOperator.EQUALS, QueueJobStatus.QUEUED)
                                                         // .or(QueueJob.class.getDeclaredField("status"),
@@ -82,18 +82,13 @@ public class ChannelController {
                                                         break;
                                                 }
                                         }
-
                                         if (existingJob != null) {
                                                 return ResponseEntity.accepted()
                                                                 .body(new CommandAcceptedResponse(existingJob.getId()));
                                         }
-
                                         QueueJob queueJob = workCommandProducer.publish(
-                                                        QueueJobType.FETCH_PLATFORM_CONTENT,
-                                                        command,
-                                                        null,
+                                                        QueueJobType.FETCH_PLATFORM_CONTENT, command, null,
                                                         queueJobDao);
-
                                         return ResponseEntity.accepted()
                                                         .body(new CommandAcceptedResponse(queueJob.getId()));
                                 }

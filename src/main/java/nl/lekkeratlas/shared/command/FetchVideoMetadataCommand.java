@@ -12,7 +12,7 @@ public record FetchVideoMetadataCommand(
                 return "addvideo:" + videoId + ":" + requestedByUserId;
         }
 
-        // TODO Update so that the same video can't be added multiple times (why would
+        // TODO: Update so that the same video can't be added multiple times (why would
         // we want that?)
         @Override
         public String dedupeKey() {

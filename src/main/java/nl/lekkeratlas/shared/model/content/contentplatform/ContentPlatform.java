@@ -26,7 +26,7 @@ public class ContentPlatform implements TableEntity {
         private final String displayName;
 
         @TableColumn(columnName = "fetch_new_content_is_automated")
-        private final Boolean fetchNewContentIsAutomated; // TODO think about interval value
+        private final Boolean fetchNewContentIsAutomated; // TODO: think about interval value
 
         @ForeignKey
         @TableColumn(columnName = "added_by_user_id")
