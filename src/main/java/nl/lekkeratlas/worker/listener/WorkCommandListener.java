@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 
 import io.github.david.auk.fluid.jdbc.components.daos.Dao;
 import io.github.david.auk.fluid.jdbc.factories.DAOFactory;
-import nl.lekkeratlas.shared.command.FetchPlatformContentCommand;
+import nl.lekkeratlas.shared.command.FetchCreatorAccountContentCommand;
 import nl.lekkeratlas.shared.command.FetchVideoMetadataCommand;
 import nl.lekkeratlas.shared.command.WorkCommandEnvelope;
 import nl.lekkeratlas.shared.model.queue.QueueJob;
@@ -24,7 +24,7 @@ import nl.lekkeratlas.shared.rabbit.WorkCommandUpdateProducer;
 import nl.lekkeratlas.worker.exceptions.QueueJobException;
 import nl.lekkeratlas.worker.execution.QueueJobCancellationToken;
 import nl.lekkeratlas.worker.execution.QueueJobExecutionService;
-import nl.lekkeratlas.worker.handler.FetchPlatformContentCommandHandler;
+import nl.lekkeratlas.worker.handler.FetchCreatorAccountContentCommandHandler;
 import nl.lekkeratlas.worker.handler.FetchVideoMetadataCommandHandler;
 import tools.jackson.databind.ObjectMapper;
 
@@ -41,20 +41,20 @@ public class WorkCommandListener {
         private static final Logger logger = LoggerFactory.getLogger(WorkCommandListener.class);
 
         private final ObjectMapper objectMapper;
-        private final FetchPlatformContentCommandHandler fetchPlatformContentCommandHandler;
+        private final FetchCreatorAccountContentCommandHandler fetchCreatorAccountContentCommandHandler;
         private final FetchVideoMetadataCommandHandler fetchVideoMetadataCommandHandler;
         private final WorkCommandUpdateProducer workCommandUpdateProducer;
         private final QueueJobExecutionService queueJobExecutionService;
 
         public WorkCommandListener(
                         ObjectMapper objectMapper,
-                        FetchPlatformContentCommandHandler fetchPlatformContentCommandHandler,
+                        FetchCreatorAccountContentCommandHandler fetchCreatorAccountContentCommandHandler,
                         FetchVideoMetadataCommandHandler fetchVideoMetadataCommandHandler,
                         WorkCommandUpdateProducer workCommandUpdateProducer,
                         QueueJobExecutionService queueJobExecutionService) {
 
                 this.objectMapper = objectMapper;
-                this.fetchPlatformContentCommandHandler = fetchPlatformContentCommandHandler;
+                this.fetchCreatorAccountContentCommandHandler = fetchCreatorAccountContentCommandHandler;
                 this.fetchVideoMetadataCommandHandler = fetchVideoMetadataCommandHandler;
                 this.workCommandUpdateProducer = workCommandUpdateProducer;
                 this.queueJobExecutionService = queueJobExecutionService;
@@ -94,8 +94,8 @@ public class WorkCommandListener {
                         throws Exception {
 
                 switch (envelope.type()) {
-                        case FETCH_PLATFORM_CONTENT ->
-                                handleFetchPlatformContent(
+                        case FETCH_CREATOR_ACCOUNT_CONTENT ->
+                                handleFetchCreatorAccountContent(
                                                 envelope,
                                                 cancellation);
 
@@ -111,18 +111,18 @@ public class WorkCommandListener {
                 }
         }
 
-        private void handleFetchPlatformContent(
+        private void handleFetchCreatorAccountContent(
                         WorkCommandEnvelope envelope,
                         QueueJobCancellationToken cancellation)
                         throws QueueJobException,
                         SQLException,
                         NoSuchFieldException {
 
-                FetchPlatformContentCommand command = objectMapper.convertValue(
+                FetchCreatorAccountContentCommand command = objectMapper.convertValue(
                                 envelope.payload(),
-                                FetchPlatformContentCommand.class);
+                                FetchCreatorAccountContentCommand.class);
 
-                fetchPlatformContentCommandHandler.handle(
+                fetchCreatorAccountContentCommandHandler.handle(
                                 envelope,
                                 command,
                                 cancellation);

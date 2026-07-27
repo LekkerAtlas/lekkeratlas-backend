@@ -24,15 +24,13 @@ import io.github.david.auk.fluid.jdbc.components.daos.DaoTransactional;
 import io.github.david.auk.fluid.jdbc.components.daos.QueryBuilder;
 import io.github.david.auk.fluid.jdbc.factories.DAOFactory;
 import nl.lekkeratlas.shared.command.AddVideoSource;
-import nl.lekkeratlas.shared.command.FetchPlatformContentCommand;
+import nl.lekkeratlas.shared.command.FetchCreatorAccountContentCommand;
 import nl.lekkeratlas.shared.command.FetchVideoMetadataCommand;
 import nl.lekkeratlas.shared.command.WorkCommandEnvelope;
 import nl.lekkeratlas.shared.model.content.Content;
-import nl.lekkeratlas.shared.model.content.contentplatform.ContentPlatform;
-import nl.lekkeratlas.shared.model.content.contentplatform.ContentPlatformKind;
-import nl.lekkeratlas.shared.model.content.contentplatform.ContentVideoPlatform;
-import nl.lekkeratlas.shared.model.content.contentplatform.SourceKind;
-import nl.lekkeratlas.shared.model.content.contentplatform.YoutubeChannel;
+import nl.lekkeratlas.shared.model.content.creator.Creator;
+import nl.lekkeratlas.shared.model.content.creator.CreatorAccount;
+import nl.lekkeratlas.shared.model.content.creator.CreatorAccountKind;
 import nl.lekkeratlas.shared.model.content.hostedcontent.HostedContent;
 import nl.lekkeratlas.shared.model.queue.QueueJob;
 import nl.lekkeratlas.shared.model.queue.QueueJobStatus;
@@ -48,7 +46,7 @@ import nl.lekkeratlas.worker.service.QueueJobLookupService;
 import nl.lekkeratlas.worker.service.UserLookupService;
 
 /**
- * Handles channel imports.
+ * Handles creator-account imports.
  *
  * <p>
  * This handler discovers videos and enqueues
@@ -56,7 +54,7 @@ import nl.lekkeratlas.worker.service.UserLookupService;
  * {@link FetchVideoMetadataCommandHandler}.
  */
 @Component
-public class FetchPlatformContentCommandHandler {
+public class FetchCreatorAccountContentCommandHandler {
 
         private final ChannelScraper channelScraper;
         private final WorkCommandProducer workCommandProducer;
@@ -64,7 +62,7 @@ public class FetchPlatformContentCommandHandler {
         private final UserLookupService userLookupService;
         private final QueueJobLookupService queueJobLookupService;
 
-        public FetchPlatformContentCommandHandler(
+        public FetchCreatorAccountContentCommandHandler(
                         ChannelScraper channelScraper,
                         WorkCommandProducer workCommandProducer,
                         WorkCommandUpdateProducer workCommandUpdateProducer,
@@ -80,7 +78,7 @@ public class FetchPlatformContentCommandHandler {
 
         public void handle(
                         WorkCommandEnvelope envelope,
-                        FetchPlatformContentCommand command,
+                        FetchCreatorAccountContentCommand command,
                         QueueJobCancellationToken cancellation)
                         throws QueueJobException, SQLException, NoSuchFieldException {
 
@@ -97,7 +95,9 @@ public class FetchPlatformContentCommandHandler {
                                         envelope.commandId());
                 }
 
-                String channelId = command.channelId();
+                String channelId = switch (command.accountKind()) {
+                        case YOUTUBE_CHANNEL -> command.externalAccountId();
+                };
 
                 if (channelId == null || channelId.isBlank()) {
                         throw new FailedQueueJobException(
@@ -106,7 +106,7 @@ public class FetchPlatformContentCommandHandler {
                                         "Channel ID cannot be empty");
                 }
 
-                cancellation.checkpoint("Channel import was canceled before scraping started");
+                cancellation.checkpoint("Creator-account import was canceled before scraping started");
 
                 workCommandUpdateProducer.update(
                                 scrapeChannelQueueJob,
@@ -118,7 +118,7 @@ public class FetchPlatformContentCommandHandler {
                                 scrapeChannelQueueJob,
                                 cancellation);
 
-                cancellation.checkpoint("Channel import was canceled after scraping the channel");
+                cancellation.checkpoint("Creator-account import was canceled after scraping the channel");
 
                 if (channelOverviewResponse == null) {
                         throw new FailedQueueJobException(
@@ -139,23 +139,27 @@ public class FetchPlatformContentCommandHandler {
                                                                         .channel()
                                                                         .title());
 
-                        cancellation.checkpoint("Channel import was canceled before saving the channel");
+                        cancellation.checkpoint("Creator-account import was canceled before saving the account");
 
-                        YoutubeChannel youtubeChannel = addYoutubeChannel(
+                        CreatorAccount creatorAccount = findOrCreateCreatorAccount(
                                         channelOverviewResponse.channel(),
+                                        command.accountKind(),
                                         user);
 
-                        cancellation.checkpoint("Channel import was canceled before synchronizing videos");
+                        cancellation.checkpoint("Creator-account import was canceled before synchronizing videos");
 
                         syncVideos(
                                         connection,
                                         channelOverviewResponse,
-                                        youtubeChannel,
+                                        creatorAccount,
                                         user,
                                         scrapeChannelQueueJob,
                                         cancellation);
 
-                        workCommandUpdateProducer.update(connection, scrapeChannelQueueJob, QueueJobStatus.COMPLETED,
+                        workCommandUpdateProducer.update(
+                                        connection,
+                                        scrapeChannelQueueJob,
+                                        QueueJobStatus.COMPLETED,
                                         "Finished scraping channel " + channelId);
                 }
         }
@@ -169,20 +173,12 @@ public class FetchPlatformContentCommandHandler {
                 try {
                         return channelScraper.findVideoIds(channelId);
                 } catch (InterruptedException exception) {
-                        /*
-                         * An expected cancellation interrupt is translated into
-                         * a domain-level CANCELED exception.
-                         */
                         if (cancellation.isCancellationRequested()) {
                                 throw cancellation.canceledException(
                                                 "Channel scraping was canceled for channel "
                                                                 + channelId);
                         }
 
-                        /*
-                         * This interruption was not triggered by queue-job
-                         * cancellation, so preserve it and report a failure.
-                         */
                         Thread.currentThread().interrupt();
 
                         throw new FailedQueueJobException(
@@ -198,7 +194,7 @@ public class FetchPlatformContentCommandHandler {
         private void syncVideos(
                         Connection connection,
                         ChannelOverviewResponse response,
-                        YoutubeChannel youtubeChannel,
+                        CreatorAccount creatorAccount,
                         User user,
                         QueueJob parentQueueJob,
                         QueueJobCancellationToken cancellation)
@@ -206,7 +202,7 @@ public class FetchPlatformContentCommandHandler {
 
                 List<HostedContent> existingVideos = findExistingVideos(
                                 connection,
-                                youtubeChannel);
+                                creatorAccount);
 
                 Map<String, HostedContent> existingByExternalId = existingVideos.stream()
                                 .collect(Collectors.toMap(
@@ -216,7 +212,7 @@ public class FetchPlatformContentCommandHandler {
                 List<PartialVideo> newVideos = new ArrayList<>();
 
                 for (PartialVideo partialVideo : response.videos()) {
-                        cancellation.checkpoint("Channel import was canceled while synchronizing videos");
+                        cancellation.checkpoint("Creator-account import was canceled while synchronizing videos");
 
                         HostedContent existingVideo = existingByExternalId.get(
                                         partialVideo.id());
@@ -235,7 +231,7 @@ public class FetchPlatformContentCommandHandler {
                 addVideos(
                                 connection,
                                 newVideos,
-                                youtubeChannel,
+                                creatorAccount,
                                 user,
                                 parentQueueJob,
                                 cancellation);
@@ -244,7 +240,7 @@ public class FetchPlatformContentCommandHandler {
         private void addVideos(
                         Connection connection,
                         List<PartialVideo> videos,
-                        ContentPlatform contentPlatform,
+                        CreatorAccount creatorAccount,
                         User requestedBy,
                         QueueJob parentQueueJob,
                         QueueJobCancellationToken cancellation)
@@ -255,14 +251,15 @@ public class FetchPlatformContentCommandHandler {
                                 QueueJob.class)) {
 
                         for (PartialVideo video : videos) {
-                                cancellation.checkpoint("Channel import was canceled while creating metadata jobs");
+                                cancellation.checkpoint(
+                                                "Creator-account import was canceled while creating metadata jobs");
 
                                 workCommandProducer.publish(
                                                 QueueJobType.FETCH_VIDEO_METADATA,
                                                 new FetchVideoMetadataCommand(
                                                                 video.id(),
                                                                 requestedBy.getId(),
-                                                                contentPlatform.getId(),
+                                                                creatorAccount.getId(),
                                                                 AddVideoSource.DISCOVERED_FROM_CHANNEL),
                                                 parentQueueJob,
                                                 queueJobDao);
@@ -272,7 +269,7 @@ public class FetchPlatformContentCommandHandler {
 
         private List<HostedContent> findExistingVideos(
                         Connection connection,
-                        YoutubeChannel youtubeChannel)
+                        CreatorAccount creatorAccount)
                         throws NoSuchFieldException {
 
                 try (Dao<HostedContent, UUID> hostedContentDao = DAOFactory.createDAO(
@@ -282,9 +279,9 @@ public class FetchPlatformContentCommandHandler {
                         return new QueryBuilder<>(hostedContentDao)
                                         .where(
                                                         HostedContent.class.getDeclaredField(
-                                                                        "contentPlatform"),
+                                                                        "creatorAccount"),
                                                         EQUALS,
-                                                        youtubeChannel.getId())
+                                                        creatorAccount.getId())
                                         .get();
                 }
         }
@@ -305,66 +302,64 @@ public class FetchPlatformContentCommandHandler {
                 }
         }
 
-        private YoutubeChannel addYoutubeChannel(
+        private CreatorAccount findOrCreateCreatorAccount(
                         Channel channel,
+                        CreatorAccountKind accountKind,
                         User addedBy)
                         throws SQLException, NoSuchFieldException {
 
                 // TODO: Improve this naming in the scraper project.
-                String channelId = channel.channelId().channelId();
+                String externalAccountId = channel.channelId().channelId();
 
                 try (Connection transactionalConnection = Database.getConnection()) {
-
                         transactionalConnection.setAutoCommit(false);
 
                         try (
-                                        DaoTransactional<ContentPlatform, UUID> contentPlatformDao = DAOFactory
+                                        DaoTransactional<Creator, UUID> contentCreatorDao = DAOFactory
                                                         .createTransactionalDAO(
                                                                         transactionalConnection,
-                                                                        ContentPlatform.class);
+                                                                        Creator.class);
 
-                                        DaoTransactional<ContentVideoPlatform, UUID> contentVideoPlatformDao = DAOFactory
+                                        DaoTransactional<CreatorAccount, UUID> creatorAccountDao = DAOFactory
                                                         .createTransactionalDAO(
                                                                         transactionalConnection,
-                                                                        ContentVideoPlatform.class);
+                                                                        CreatorAccount.class)) {
 
-                                        DaoTransactional<YoutubeChannel, UUID> youtubeChannelDao = DAOFactory
-                                                        .createTransactionalDAO(
-                                                                        transactionalConnection,
-                                                                        YoutubeChannel.class)) {
+                                CreatorAccount existingAccount = getCreatorAccount(
+                                                creatorAccountDao,
+                                                accountKind,
+                                                externalAccountId);
 
-                                YoutubeChannel existingChannel = getYoutubeChannel(
-                                                youtubeChannelDao,
-                                                channelId);
-
-                                if (existingChannel != null) {
-                                        return existingChannel;
+                                if (existingAccount != null) {
+                                        return existingAccount;
                                 }
 
-                                ContentPlatform contentPlatform = new ContentPlatform(
+                                Instant now = Instant.now();
+
+                                Creator contentCreator = new Creator(
                                                 UUID.randomUUID(),
-                                                ContentPlatformKind.VIDEO,
+                                                channel.title(),
+                                                addedBy,
+                                                now,
+                                                now);
+
+                                CreatorAccount creatorAccount = new CreatorAccount(
+                                                UUID.randomUUID(),
+                                                contentCreator,
+                                                accountKind,
+                                                externalAccountId,
                                                 channel.title(),
                                                 false,
                                                 addedBy,
-                                                Instant.now());
+                                                now,
+                                                now);
 
-                                ContentVideoPlatform contentVideoPlatform = new ContentVideoPlatform(
-                                                contentPlatform,
-                                                SourceKind.YOUTUBE_CHANNEL);
-
-                                YoutubeChannel youtubeChannel = new YoutubeChannel(
-                                                contentVideoPlatform,
-                                                channelId);
-
-                                contentPlatformDao.add(contentPlatform);
-                                contentVideoPlatformDao.add(
-                                                contentVideoPlatform);
-                                youtubeChannelDao.add(youtubeChannel);
+                                contentCreatorDao.add(contentCreator);
+                                creatorAccountDao.add(creatorAccount);
 
                                 transactionalConnection.commit();
 
-                                return youtubeChannel;
+                                return creatorAccount;
                         } catch (SQLException | RuntimeException exception) {
                                 transactionalConnection.rollback();
                                 throw exception;
@@ -372,17 +367,23 @@ public class FetchPlatformContentCommandHandler {
                 }
         }
 
-        private YoutubeChannel getYoutubeChannel(
-                        Dao<YoutubeChannel, UUID> youtubeChannelDao,
-                        String channelId)
+        private CreatorAccount getCreatorAccount(
+                        Dao<CreatorAccount, UUID> creatorAccountDao,
+                        CreatorAccountKind accountKind,
+                        String externalAccountId)
                         throws NoSuchFieldException {
 
-                return new QueryBuilder<>(youtubeChannelDao)
+                return new QueryBuilder<>(creatorAccountDao)
                                 .where(
-                                                YoutubeChannel.class.getDeclaredField(
-                                                                "youtubeChannelId"),
+                                                CreatorAccount.class.getDeclaredField(
+                                                                "accountKind"),
                                                 EQUALS,
-                                                channelId)
+                                                accountKind)
+                                .and(
+                                                CreatorAccount.class.getDeclaredField(
+                                                                "externalAccountId"),
+                                                EQUALS,
+                                                externalAccountId)
                                 .getUnique();
         }
 }

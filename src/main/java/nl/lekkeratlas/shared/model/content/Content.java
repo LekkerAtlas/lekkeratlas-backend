@@ -6,15 +6,20 @@ import java.util.UUID;
 
 import io.github.david.auk.fluid.jdbc.annotations.table.TableName;
 import io.github.david.auk.fluid.jdbc.annotations.table.constructor.TableConstructor;
+import io.github.david.auk.fluid.jdbc.annotations.table.field.ForeignKey;
 import io.github.david.auk.fluid.jdbc.annotations.table.field.PrimaryKey;
 import io.github.david.auk.fluid.jdbc.annotations.table.field.TableColumn;
 import io.github.david.auk.fluid.jdbc.components.tables.TableEntity;
+import nl.lekkeratlas.shared.model.content.creator.Creator;
 
 @TableName("content")
 public final class Content implements TableEntity {
         @TableColumn
         @PrimaryKey
         private final UUID id;
+        @ForeignKey
+        @TableColumn(columnName = "creator_id")
+        private final Creator creator;
         @TableColumn(columnName = "content_type")
         private final ContentType type;
         @TableColumn
@@ -32,9 +37,10 @@ public final class Content implements TableEntity {
 
         @SuppressWarnings("java:S107")
         @TableConstructor
-        public Content(UUID id, ContentType type, String title, String description, Boolean showGamesPlayedByDefault,
-                        Instant publishedAt, Instant createdAt, Instant updatedAt) {
+        public Content(UUID id, Creator creator, ContentType type, String title, String description,
+                        Boolean showGamesPlayedByDefault, Instant publishedAt, Instant createdAt, Instant updatedAt) {
                 this.id = id;
+                this.creator = creator;
                 this.type = type;
                 this.title = title;
                 this.description = description;
@@ -46,6 +52,10 @@ public final class Content implements TableEntity {
 
         public UUID id() {
                 return id;
+        }
+
+        public Creator creator() {
+                return creator;
         }
 
         public ContentType type() {
@@ -84,6 +94,7 @@ public final class Content implements TableEntity {
                         return false;
                 var that = (Content) obj;
                 return Objects.equals(this.id, that.id) &&
+                                Objects.equals(this.creator, that.creator) &&
                                 Objects.equals(this.type, that.type) &&
                                 Objects.equals(this.title, that.title) &&
                                 Objects.equals(this.description, that.description) &&
@@ -95,14 +106,15 @@ public final class Content implements TableEntity {
 
         @Override
         public int hashCode() {
-                return Objects.hash(id, type, title, description, showGamesPlayedByDefault, publishedAt, createdAt,
-                                updatedAt);
+                return Objects.hash(id, creator, type, title, description, showGamesPlayedByDefault, publishedAt,
+                                createdAt, updatedAt);
         }
 
         @Override
         public String toString() {
                 return "Content[" +
                                 "id=" + id + ", " +
+                                "creator=" + creator + ", " +
                                 "type=" + type + ", " +
                                 "title=" + title + ", " +
                                 "description=" + description + ", " +

@@ -1,4 +1,4 @@
-package nl.lekkeratlas.shared.model.content.contentplatform;
+package nl.lekkeratlas.shared.model.content.creator;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -12,21 +12,28 @@ import io.github.david.auk.fluid.jdbc.annotations.table.field.TableColumn;
 import io.github.david.auk.fluid.jdbc.components.tables.TableEntity;
 import nl.lekkeratlas.shared.model.user.User;
 
-@TableName("content_platform")
-public class ContentPlatform implements TableEntity {
+@TableName("creator_account")
+public final class CreatorAccount implements TableEntity {
 
         @PrimaryKey
         @TableColumn
         private final UUID id;
 
-        @TableColumn(columnName = "platform_kind")
-        private final ContentPlatformKind platformKind;
+        @ForeignKey
+        @TableColumn(columnName = "creator_id")
+        private final Creator creator;
+
+        @TableColumn(columnName = "account_kind")
+        private final CreatorAccountKind accountKind;
+
+        @TableColumn(columnName = "external_account_id")
+        private final String externalAccountId;
 
         @TableColumn(columnName = "display_name")
         private final String displayName;
 
         @TableColumn(columnName = "fetch_new_content_is_automated")
-        private final Boolean fetchNewContentIsAutomated; // TODO: think about interval value
+        private final Boolean fetchNewContentIsAutomated;
 
         @ForeignKey
         @TableColumn(columnName = "added_by_user_id")
@@ -35,33 +42,51 @@ public class ContentPlatform implements TableEntity {
         @TableColumn(columnName = "created_at")
         private final Instant createdAt;
 
+        @TableColumn(columnName = "updated_at")
+        private final Instant updatedAt;
+
+        @SuppressWarnings("java:S107")
         @TableConstructor
-        public ContentPlatform(UUID id, ContentPlatformKind platformKind, String displayName,
-                        Boolean fetchNewContentIsAutomated, User addedBy, Instant createdAt) {
+        public CreatorAccount(
+                        UUID id,
+                        Creator creator,
+                        CreatorAccountKind accountKind,
+                        String externalAccountId,
+                        String displayName,
+                        Boolean fetchNewContentIsAutomated,
+                        User addedBy,
+                        Instant createdAt,
+                        Instant updatedAt) {
+
                 this.id = Objects.requireNonNullElseGet(id, UUID::randomUUID);
-                this.platformKind = platformKind;
+                this.creator = creator;
+                this.accountKind = accountKind;
+                this.externalAccountId = externalAccountId;
                 this.displayName = displayName;
                 this.fetchNewContentIsAutomated = fetchNewContentIsAutomated;
                 this.addedBy = addedBy;
                 this.createdAt = createdAt;
+                this.updatedAt = updatedAt;
         }
 
-        public ContentPlatform(ContentPlatform contentPlatform) {
-                this(
-                                contentPlatform.getId(),
-                                contentPlatform.getPlatformKind(),
-                                contentPlatform.getDisplayName(),
-                                contentPlatform.getFetchNewContentIsAutomated(),
-                                contentPlatform.getAddedBy(),
-                                contentPlatform.getCreatedAt());
+        public UUID id() {
+                return id;
         }
 
         public UUID getId() {
                 return id;
         }
 
-        public ContentPlatformKind getPlatformKind() {
-                return platformKind;
+        public Creator getCreator() {
+                return creator;
+        }
+
+        public CreatorAccountKind getAccountKind() {
+                return accountKind;
+        }
+
+        public String getExternalAccountId() {
+                return externalAccountId;
         }
 
         public String getDisplayName() {
@@ -80,9 +105,16 @@ public class ContentPlatform implements TableEntity {
                 return createdAt;
         }
 
-        public static ContentPlatform getDummyContentPlatform(UUID id) {
-                return new ContentPlatform(
+        public Instant getUpdatedAt() {
+                return updatedAt;
+        }
+
+        public static CreatorAccount getDummyCreatorAccount(UUID id) {
+                return new CreatorAccount(
                                 id,
+                                null,
+                                null,
+                                null,
                                 null,
                                 null,
                                 null,

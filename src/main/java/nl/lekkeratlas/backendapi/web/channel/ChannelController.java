@@ -22,8 +22,9 @@ import nl.lekkeratlas.backendapi.exceptions.JsonWebTokenException;
 import nl.lekkeratlas.backendapi.web.Utils;
 import nl.lekkeratlas.backendapi.web.dto.AddChannelRequest;
 import nl.lekkeratlas.backendapi.web.dto.CommandAcceptedResponse;
-import nl.lekkeratlas.shared.command.FetchPlatformContentCommand;
+import nl.lekkeratlas.shared.command.FetchCreatorAccountContentCommand;
 import nl.lekkeratlas.shared.exceptions.UserNotFoundException;
+import nl.lekkeratlas.shared.model.content.creator.CreatorAccountKind;
 import nl.lekkeratlas.shared.model.queue.QueueJob;
 import nl.lekkeratlas.shared.model.queue.QueueJobType;
 import nl.lekkeratlas.shared.model.user.User;
@@ -58,8 +59,9 @@ public class ChannelController {
                                         throw new UserNotFoundException("User not found");
                                 }
 
-                                FetchPlatformContentCommand command = new FetchPlatformContentCommand(
+                                FetchCreatorAccountContentCommand command = new FetchCreatorAccountContentCommand(
                                                 request.channelId(),
+                                                CreatorAccountKind.YOUTUBE_CHANNEL,
                                                 userId);
 
                                 try (Dao<QueueJob, UUID> queueJobDao = DAOFactory.createDAO(connection,
@@ -87,7 +89,7 @@ public class ChannelController {
                                                                 .body(new CommandAcceptedResponse(existingJob.getId()));
                                         }
                                         QueueJob queueJob = workCommandProducer.publish(
-                                                        QueueJobType.FETCH_PLATFORM_CONTENT, command, null,
+                                                        QueueJobType.FETCH_CREATOR_ACCOUNT_CONTENT, command, null,
                                                         queueJobDao);
                                         return ResponseEntity.accepted()
                                                         .body(new CommandAcceptedResponse(queueJob.getId()));
