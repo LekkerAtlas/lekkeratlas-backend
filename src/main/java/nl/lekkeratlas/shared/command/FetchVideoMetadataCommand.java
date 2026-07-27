@@ -5,7 +5,7 @@ import java.util.UUID;
 public record FetchVideoMetadataCommand(
                 String videoId,
                 UUID requestedByUserId,
-                UUID contentPlatformId,
+                UUID creatorAccountId,
                 AddVideoSource source) implements Command {
         @Override
         public String correlationKey() {

@@ -16,7 +16,6 @@ import nl.lekkeratlas.shared.model.queue.QueueJobCancellationRequest;
 import nl.lekkeratlas.shared.model.user.User;
 
 @Service
-// @RequiredArgsConstructor
 public class JobService {
 
         @Transactional

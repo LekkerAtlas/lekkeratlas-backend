@@ -13,12 +13,14 @@ import com.github.davidauk.youtubescraper.model.content.Video;
 
 import io.github.david.auk.fluid.jdbc.components.Database;
 import io.github.david.auk.fluid.jdbc.components.daos.Dao;
+import io.github.david.auk.fluid.jdbc.components.daos.DaoTransactional;
 import io.github.david.auk.fluid.jdbc.factories.DAOFactory;
 import nl.lekkeratlas.shared.command.FetchVideoMetadataCommand;
 import nl.lekkeratlas.shared.command.WorkCommandEnvelope;
 import nl.lekkeratlas.shared.model.content.Content;
 import nl.lekkeratlas.shared.model.content.ContentType;
-import nl.lekkeratlas.shared.model.content.contentplatform.ContentPlatform;
+import nl.lekkeratlas.shared.model.content.creator.Creator;
+import nl.lekkeratlas.shared.model.content.creator.CreatorAccount;
 import nl.lekkeratlas.shared.model.content.hostedcontent.HostedContent;
 import nl.lekkeratlas.shared.model.queue.QueueJob;
 import nl.lekkeratlas.shared.model.queue.QueueJobStatus;
@@ -34,7 +36,7 @@ import nl.lekkeratlas.worker.service.UserLookupService;
  * Handles video imports.
  *
  * <p>
- * Both directly added videos and videos discovered from channels end up
+ * Both directly added videos and videos discovered from creator accounts end up
  * here.
  */
 @Component
@@ -57,14 +59,6 @@ public class FetchVideoMetadataCommandHandler {
                 this.queueJobLookupService = queueJobLookupService;
         }
 
-        /**
-         * Handles a video-metadata command.
-         *
-         * @param envelope     the incoming queued request
-         * @param command      the video-metadata command
-         * @param cancellation cancellation state for this queue-job execution
-         * @throws QueueJobException when the queue job fails or is canceled
-         */
         public void handle(
                         WorkCommandEnvelope envelope,
                         FetchVideoMetadataCommand command,
@@ -75,11 +69,6 @@ public class FetchVideoMetadataCommandHandler {
                                 envelope,
                                 command);
 
-                /*
-                 * Handle jobs that were already canceled before this handler
-                 * started. This closes the small gap before the cancellation
-                 * monitor performs its first poll.
-                 */
                 if (scrapeVideoQueueJob.isCanceled()) {
                         throw cancellation.canceledException(
                                         "Video metadata job was canceled before execution");
@@ -101,14 +90,6 @@ public class FetchVideoMetadataCommandHandler {
                                 cancellation);
         }
 
-        /**
-         * Loads and validates the user and queue job associated with the
-         * command.
-         *
-         * @param envelope the incoming queued request
-         * @param command  the command being handled
-         * @return the related queue job
-         */
         private QueueJob validateAndLoadScrapeVideoQueueJob(
                         WorkCommandEnvelope envelope,
                         FetchVideoMetadataCommand command) {
@@ -143,8 +124,9 @@ public class FetchVideoMetadataCommandHandler {
 
                         Video videoMetadata = videoMetadataScraper.scrape(videoId);
 
-                        cancellation.checkpoint("Video metadata job was canceled while scraping video "
-                                        + videoId);
+                        cancellation.checkpoint(
+                                        "Video metadata job was canceled while scraping video "
+                                                        + videoId);
 
                         requireValidVideoMetadata(
                                         scrapeVideoQueueJob,
@@ -153,21 +135,12 @@ public class FetchVideoMetadataCommandHandler {
 
                         return videoMetadata;
                 } catch (InterruptedException exception) {
-                        /*
-                         * The cancellation monitor marks the token before
-                         * interrupting the dedicated queue-job thread.
-                         */
                         if (cancellation.isCancellationRequested()) {
                                 throw cancellation.canceledException(
                                                 "Video scraping was canceled for "
                                                                 + videoId);
                         }
 
-                        /*
-                         * This interruption did not originate from a user
-                         * cancellation. Preserve it and report the execution as
-                         * failed.
-                         */
                         Thread.currentThread().interrupt();
 
                         throw new FailedQueueJobException(
@@ -213,9 +186,9 @@ public class FetchVideoMetadataCommandHandler {
 
                 try (Connection connection = Database.getConnection()) {
                         cancellation.checkpoint(
-                                        "Video metadata job was canceled before validating the content platform");
+                                        "Video metadata job was canceled before validating the creator account");
 
-                        requireExistingContentPlatform(
+                        CreatorAccount creatorAccount = requireExistingCreatorAccount(
                                         connection,
                                         command,
                                         scrapeVideoQueueJob);
@@ -224,13 +197,9 @@ public class FetchVideoMetadataCommandHandler {
 
                         saveContentAndHostedContent(
                                         connection,
-                                        command,
+                                        creatorAccount,
                                         videoMetadata);
 
-                        /*
-                         * Prevent a cancellation near the end of the operation
-                         * from being overwritten by COMPLETED.
-                         */
                         cancellation.checkpoint("Video metadata job was canceled before completion");
 
                         workCommandUpdateProducer.update(
@@ -245,61 +214,81 @@ public class FetchVideoMetadataCommandHandler {
                 }
         }
 
-        private void requireExistingContentPlatform(
+        private CreatorAccount requireExistingCreatorAccount(
                         Connection connection,
                         FetchVideoMetadataCommand command,
                         QueueJob scrapeVideoQueueJob)
                         throws FailedQueueJobException {
 
-                try (Dao<ContentPlatform, UUID> contentPlatformDao = DAOFactory.createDAO(
+                try (Dao<CreatorAccount, UUID> creatorAccountDao = DAOFactory.createDAO(
                                 connection,
-                                ContentPlatform.class)) {
+                                CreatorAccount.class)) {
 
-                        if (!contentPlatformDao.existsByPrimaryKey(
-                                        command.contentPlatformId())) {
+                        CreatorAccount creatorAccount = creatorAccountDao.get(
+                                        command.creatorAccountId());
 
+                        if (creatorAccount == null || creatorAccount.getCreator() == null) {
                                 throw new FailedQueueJobException(
                                                 scrapeVideoQueueJob,
-                                                "ContentPlatform ID has null value for video "
+                                                "CreatorAccount ID could not be resolved for video "
                                                                 + command.videoId(),
-                                                "Could not find related content platform, "
+                                                "Could not find the related creator account, "
                                                                 + "please inform the administrator");
                         }
+
+                        return creatorAccount;
                 }
         }
 
         private void saveContentAndHostedContent(
                         Connection connection,
-                        FetchVideoMetadataCommand command,
-                        Video videoMetadata) {
+                        CreatorAccount creatorAccount,
+                        Video videoMetadata)
+                        throws SQLException {
+
+                boolean originalAutoCommit = connection.getAutoCommit();
+                connection.setAutoCommit(false);
 
                 try (
-                                Dao<Content, UUID> contentDao = DAOFactory.createDAO(
+                                DaoTransactional<Content, UUID> contentDao = DAOFactory.createTransactionalDAO(
                                                 connection,
                                                 Content.class);
 
-                                Dao<HostedContent, UUID> hostedContentDao = DAOFactory.createDAO(
-                                                connection,
-                                                HostedContent.class)) {
+                                DaoTransactional<HostedContent, UUID> hostedContentDao = DAOFactory
+                                                .createTransactionalDAO(
+                                                                connection,
+                                                                HostedContent.class)) {
 
-                        Content content = createContent(videoMetadata);
+                        Content content = createContent(
+                                        videoMetadata,
+                                        creatorAccount.getCreator());
 
                         contentDao.add(content);
 
                         HostedContent hostedContent = createHostedContent(
-                                        command,
                                         videoMetadata,
-                                        content);
+                                        content,
+                                        creatorAccount);
 
                         hostedContentDao.add(hostedContent);
+                        connection.commit();
+                } catch (SQLException | RuntimeException exception) {
+                        connection.rollback();
+                        throw exception;
+                } finally {
+                        connection.setAutoCommit(originalAutoCommit);
                 }
         }
 
-        private Content createContent(Video videoMetadata) {
+        private Content createContent(
+                        Video videoMetadata,
+                        Creator creator) {
+
                 Instant now = Instant.now();
 
                 return new Content(
                                 UUID.randomUUID(),
+                                creator,
                                 ContentType.OTHER,
                                 videoMetadata.getTitle(),
                                 videoMetadata.getDescription(),
@@ -310,20 +299,16 @@ public class FetchVideoMetadataCommandHandler {
         }
 
         private HostedContent createHostedContent(
-                        FetchVideoMetadataCommand command,
                         Video videoMetadata,
-                        Content content) {
+                        Content content,
+                        CreatorAccount creatorAccount) {
 
                 return new HostedContent(
                                 UUID.randomUUID(),
                                 content,
-
-                                /*
-                                 * Insert a placeholder content platform. Its ID
-                                 * was validated before saving.
-                                 */
-                                ContentPlatform.getDummyContentPlatform(
-                                                command.contentPlatformId()),
-                                videoMetadata.getId());
+                                creatorAccount.getCreator(),
+                                creatorAccount,
+                                videoMetadata.getId(),
+                                Instant.now());
         }
 }
