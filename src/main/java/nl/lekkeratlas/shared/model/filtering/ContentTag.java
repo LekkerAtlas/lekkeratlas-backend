@@ -30,6 +30,6 @@ public class ContentTag {
          */
         @PrimaryKey
         public String getPrimaryKey() {
-                return content.id().toString() + tag.toString();
+                return content.getId().toString() + tag.toString();
         }
 }

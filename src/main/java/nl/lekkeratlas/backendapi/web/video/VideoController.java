@@ -65,15 +65,18 @@ public class VideoController {
                                         .where(
                                                         HostedContent.class.getDeclaredField("content"),
                                                         EQUALS,
-                                                        content.id())
+                                                        content.getId())
                                         .get();
 
                         return new VideoPreview(
-                                        content.id(),
-                                        content.title(),
-                                        new CreatorInfo(content.creator().id(),
-                                                        content.creator().getDisplayName()),
-                                        content.type(),
+                                        content.getId(),
+                                        new CreatorInfo(content.getCreator().id(),
+                                                        content.getCreator().getDisplayName()),
+                                        content.getType(),
+                                        content.getTitle(),
+                                        content.getDurationSeconds(),
+                                        content.getPublishedAt(),
+                                        content.getIsBehindPaywall(),
                                         getAllVideoSources(hostedContents));
                 }
         }

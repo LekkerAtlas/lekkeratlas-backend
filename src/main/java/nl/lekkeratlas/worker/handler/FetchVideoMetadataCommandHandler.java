@@ -15,6 +15,7 @@ import io.github.david.auk.fluid.jdbc.components.Database;
 import io.github.david.auk.fluid.jdbc.components.daos.Dao;
 import io.github.david.auk.fluid.jdbc.components.daos.DaoTransactional;
 import io.github.david.auk.fluid.jdbc.factories.DAOFactory;
+
 import nl.lekkeratlas.shared.command.FetchVideoMetadataCommand;
 import nl.lekkeratlas.shared.command.WorkCommandEnvelope;
 import nl.lekkeratlas.shared.model.content.Content;
@@ -289,11 +290,13 @@ public class FetchVideoMetadataCommandHandler {
                 return new Content(
                                 UUID.randomUUID(),
                                 creator,
-                                ContentType.OTHER,
+                                ContentType.OTHER, // TODO: get this type from user input
                                 videoMetadata.getTitle(),
+                                videoMetadata.getDurationSeconds(),
                                 videoMetadata.getDescription(),
                                 true,
                                 videoMetadata.getPublishedAt(),
+                                videoMetadata.isMembersOnly(),
                                 now,
                                 now);
         }
