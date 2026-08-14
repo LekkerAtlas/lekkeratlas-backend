@@ -133,7 +133,7 @@ public class FetchCreatorAccountContentCommandHandler {
                                         scrapeChannelQueueJob,
                                         QueueJobStatus.RUNNING,
                                         "Retrieved "
-                                                        + channelOverviewResponse.videos().size()
+                                                        + channelOverviewResponse.partialVideos().size()
                                                         + " videos for: "
                                                         + channelOverviewResponse
                                                                         .channel()
@@ -211,7 +211,7 @@ public class FetchCreatorAccountContentCommandHandler {
 
                 List<PartialVideo> newVideos = new ArrayList<>();
 
-                for (PartialVideo partialVideo : response.videos()) {
+                for (PartialVideo partialVideo : response.partialVideos()) {
                         cancellation.checkpoint("Creator-account import was canceled while synchronizing videos");
 
                         HostedContent existingVideo = existingByExternalId.get(
